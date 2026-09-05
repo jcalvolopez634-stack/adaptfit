@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #f8f9fa;
+  --color-surface-dim: #d9dadb;
+  --color-surface-bright: #f8f9fa;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container: #edeeef;
+  --color-surface-container-high: #e7e8e9;
+  --color-surface-container-highest: #e1e3e4;
+  --color-on-surface: #191c1d;
+  --color-on-surface-variant: #404943;
+  --color-inverse-surface: #2e3132;
+  --color-inverse-on-surface: #f0f1f2;
+  --color-outline: #707973;
+  --color-outline-variant: #bfc9c1;
+  --color-surface-tint: #2c694e;
+
+  --color-primary: #0f5238;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2d6a4f;
+  --color-on-primary-container: #a8e7c5;
+  --color-inverse-primary: #95d4b3;
+
+  --color-secondary: #8e4e14;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #ffab69;
+  --color-on-secondary-container: #783d01;
+
+  --color-tertiary: #713638;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #8d4d4e;
+  --color-on-tertiary-container: #ffcfce;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  --color-primary-fixed: #b1f0ce;
+  --color-primary-fixed-dim: #95d4b3;
+  --color-on-primary-fixed: #002114;
+  --color-on-primary-fixed-variant: #0e5138;
+
+  --color-secondary-fixed: #ffdcc4;
+  --color-secondary-fixed-dim: #ffb780;
+  --color-on-secondary-fixed: #2f1400;
+  --color-on-secondary-fixed-variant: #6f3800;
+
+  --color-tertiary-fixed: #ffdad9;
+  --color-tertiary-fixed-dim: #ffb3b3;
+  --color-on-tertiary-fixed: #390b0e;
+  --color-on-tertiary-fixed-variant: #6f3537;
+
+  --color-background: #f8f9fa;
+  --color-on-background: #191c1d;
+  --color-surface-variant: #e1e3e4;
+  --color-calming-blue: #3A86C8;
+  --color-alert-amber: #E76F51;
+  --color-surface-dark: #1A1D20;
+  --color-surface-light: #F8F9FA;
+
+  --font-headline: "Plus Jakarta Sans", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-headline);
+}
