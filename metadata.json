@@ -2,5 +2,7 @@
   "name": "AdaptFit",
   "description": "Aplicación de entrenamiento físico adaptado, seguro y progresivo para personas con sobrepeso, dolor articular o principiantes.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
