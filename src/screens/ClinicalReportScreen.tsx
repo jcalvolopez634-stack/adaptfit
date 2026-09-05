@@ -8,6 +8,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { AnthropometricSection } from '../components/AnthropometricSection';
+import { JointSafetyIncident } from '../types';
 import {
   Activity,
   ArrowLeft,
@@ -16,6 +17,9 @@ import {
   ShieldCheck,
   FileText,
   Timer,
+  ShieldAlert,
+  AlertOctagon,
+  RefreshCw,
 } from 'lucide-react';
 
 export const ClinicalReportScreen: React.FC = () => {
@@ -174,6 +178,25 @@ export const ClinicalReportScreen: React.FC = () => {
     return reduction > 0 ? reduction : null;
   }, [sessionMetrics, initialPain, latestPain]);
 
+  // Auditoría de Seguridad Articular y Paradas Preventivas
+  const allSafetyIncidents = useMemo(() => {
+    const list: JointSafetyIncident[] = [];
+    completedWorkouts.forEach((w) => {
+      if (w.safetyIncidents && w.safetyIncidents.length > 0) {
+        list.push(...w.safetyIncidents);
+      }
+    });
+    return list;
+  }, [completedWorkouts]);
+
+  const substitutedCount = useMemo(() => {
+    return allSafetyIncidents.filter((i) => i.action === 'sustituido_por_alternativa').length;
+  }, [allSafetyIncidents]);
+
+  const discardedCount = useMemo(() => {
+    return allSafetyIncidents.filter((i) => i.action === 'descartado_seguridad').length;
+  }, [allSafetyIncidents]);
+
   // Dimensiones SVG
   const chartHeight = 160;
   const chartWidth = 320;
@@ -221,9 +244,10 @@ export const ClinicalReportScreen: React.FC = () => {
   <div class="meta-box">
     <div class="meta-grid">
       <div><strong>Paciente / Usuario:</strong> ${userProfile.name || 'Paciente'}</div>
-      <div><strong>Nivel de Movilidad Biomecánica:</strong> ${userProfile.mobilityLevel}</div>
-      <div><strong>Zonas de Protección Articular:</strong> ${(userProfile.discomfortZones || []).join(', ') || 'Ninguna'}</div>
-      <div><strong>Equipamiento Habilitado:</strong> ${(userProfile.availableEquipment || []).join(', ')}</div>
+      <div><strong>Sexo Biológico:</strong> ${userProfile.biologicalSex || 'Mujer'} (Ajuste Biomecánico y Pélvico)</div>
+      <div><strong>Nivel de Condición Física:</strong> ${userProfile.fitnessLevel || 'Iniciación / Recuperación'}</div>
+      <div><strong>Zonas de Protección / Condiciones:</strong> ${(userProfile.healthConditions && userProfile.healthConditions.length > 0 ? userProfile.healthConditions : userProfile.discomfortZones || []).join(', ') || 'Ninguna'}</div>
+      <div><strong>Equipamiento Habilitado:</strong> ${userProfile.equipmentAvailable || (userProfile.availableEquipment || []).join(', ')}</div>
       <div><strong>Frecuencia Prescrita:</strong> ${annualPlan.daysPerWeek} días/sem (${annualPlan.minutesPerSession} min/sesión)</div>
       <div><strong>Adherencia Registrada:</strong> ${adherenceRate}% (${totalSessions} sesiones realizadas)</div>
     </div>
@@ -321,7 +345,55 @@ export const ClinicalReportScreen: React.FC = () => {
       : ''
   }
 
-  <h2>${anthropometricRecords.length > 0 ? '4' : '3'}. Conclusiones y Diagnóstico Adaptativo</h2>
+  <h2>${anthropometricRecords.length > 0 ? '4' : '3'}. Auditoría de Seguridad Articular y Paradas Preventivas</h2>
+  <p><em>Principio de Prevención Activa: Los ejercicios adaptados o retirados mediante el botón de pánico NO computan como molestia tolerada ni dolor crónico, sino como neutralizaciones preventivas exitosas.</em></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Intervenciones Totales</th>
+        <th>Variantes Suaves Sustituidas</th>
+        <th>Ejercicios Retirados Preventivamente</th>
+        <th>Impacto en Sesión / Racha</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>${allSafetyIncidents.length}</strong></td>
+        <td>${substitutedCount}</td>
+        <td>${discardedCount}</td>
+        <td><span class="badge">0 Penalización (100% Seguro)</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  ${
+    allSafetyIncidents.length > 0
+      ? `<table>
+    <thead>
+      <tr>
+        <th>Fecha / Hora</th>
+        <th>Ejercicio Afectado</th>
+        <th>Acción Tomada</th>
+        <th>Resolución / Nota Clínica</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${allSafetyIncidents
+        .map(
+          (inc) => `<tr>
+        <td>${new Date(inc.timestamp).toLocaleString('es-ES')}</td>
+        <td><strong>${inc.exerciseTitle}</strong></td>
+        <td><span class="badge">${inc.action === 'sustituido_por_alternativa' ? 'Sustituido por variante suave' : 'Retirado por seguridad'}</span></td>
+        <td>${inc.replacementExerciseTitle ? `Reemplazado por: ${inc.replacementExerciseTitle}. ` : ''}${inc.clinicalNote || inc.reason}</td>
+      </tr>`
+        )
+        .join('')}
+    </tbody>
+  </table>`
+      : ''
+  }
+
+  <h2>${anthropometricRecords.length > 0 ? '5' : '4'}. Conclusiones y Diagnóstico Adaptativo</h2>
   <ul>
     ${
       isZeroState
@@ -417,6 +489,90 @@ export const ClinicalReportScreen: React.FC = () => {
             <span className="text-[10px] font-bold text-[#707973] uppercase tracking-wider">
               Adherencia
             </span>
+          </div>
+        </section>
+
+        {/* Clinical Profile & Biomechanical Rules Card */}
+        <section className="p-4 rounded-3xl bg-white border border-[#E1E3E4] shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#2D6A4F]" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D]">
+                Perfil Clínico y Prescripción Biomecánica
+              </h2>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E7F3EC] text-[#0F5238]">
+              Motor Activo
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 text-xs">
+            <div className="p-2.5 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+              <span className="text-[10px] font-bold text-[#707973] block uppercase tracking-wider">
+                Sexo Biológico
+              </span>
+              <span className="font-black text-[#191C1D] mt-0.5 block">
+                {userProfile.biologicalSex || 'Mujer'}
+              </span>
+              <span className="text-[10px] text-[#2D6A4F] font-semibold block">
+                {userProfile.biologicalSex === 'Hombre'
+                  ? 'Cadena posterior y descompresión'
+                  : 'Estabilidad lumbopélvica y rodilla'}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+              <span className="text-[10px] font-bold text-[#707973] block uppercase tracking-wider">
+                Condición Física
+              </span>
+              <span className="font-black text-[#191C1D] mt-0.5 block truncate">
+                {userProfile.fitnessLevel || 'Iniciación / Recuperación'}
+              </span>
+              <span className="text-[10px] text-[#2D6A4F] font-semibold block">
+                {userProfile.fitnessLevel === 'Activo habitual'
+                  ? '35s pausa • 12 reps'
+                  : userProfile.fitnessLevel === 'Moderado'
+                  ? '45s pausa • 10 reps'
+                  : '60s pausa • 8 reps'}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+              <span className="text-[10px] font-bold text-[#707973] block uppercase tracking-wider">
+                Equipamiento
+              </span>
+              <span className="font-black text-[#191C1D] mt-0.5 block truncate">
+                {userProfile.equipmentAvailable || 'Solo peso corporal y silla'}
+              </span>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+              <span className="text-[10px] font-bold text-[#707973] block uppercase tracking-wider">
+                Frecuencia
+              </span>
+              <span className="font-black text-[#191C1D] mt-0.5 block">
+                {annualPlan.daysPerWeek} días • {annualPlan.minutesPerSession} min
+              </span>
+            </div>
+          </div>
+
+          <div className="p-2.5 rounded-xl bg-[#E7F3EC] border border-[#B1F0CE]">
+            <span className="text-[10px] font-bold text-[#0F5238] uppercase tracking-wider block mb-1">
+              Condiciones de Protección Activa:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {(userProfile.healthConditions && userProfile.healthConditions.length > 0
+                ? userProfile.healthConditions
+                : ['Sin molestias registradas']
+              ).map((cond, idx) => (
+                <span
+                  key={idx}
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-[#B1F0CE] text-[#0F5238]"
+                >
+                  {cond}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -700,6 +856,104 @@ export const ClinicalReportScreen: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+        </section>
+
+        {/* Auditoría de Seguridad Articular y Paradas Preventivas */}
+        <section className="p-4 rounded-3xl bg-white border border-[#E1E3E4] shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-[#FFF6ED] text-[#E76F51] flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D]">
+                  Seguridad Articular Activa y Paradas Preventivas
+                </h2>
+                <span className="text-[11px] text-[#707973]">
+                  Intervenciones inmediatas ante dolor o molestia articular
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E7F3EC] text-[#0F5238]">
+              {allSafetyIncidents.length} registradas
+            </span>
+          </div>
+
+          <div className="p-3 bg-[#F8F9FA] rounded-2xl border border-[#EDEEEF] text-xs text-[#404943] leading-relaxed">
+            <strong className="text-[#191C1D] block mb-0.5">Principio Clínico de Seguridad:</strong>
+            Los ejercicios sustituidos o descartados mediante el botón de pánico{' '}
+            <strong>NO se computan como molestia tolerada</strong>, sino como paradas de seguridad preventiva exitosas que evitaron sobrecarga o inflamación articular.
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="p-3 rounded-xl bg-[#E7F3EC]/60 border border-[#B1F0CE] text-left">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#0F5238] block">
+                Variantes Suaves
+              </span>
+              <div className="text-lg font-black text-[#191C1D] mt-0.5">
+                {substitutedCount}
+              </div>
+              <span className="text-[10px] text-[#707973] block mt-0.5">
+                Sustituidas por menor impacto
+              </span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-[#FFF6ED] border border-[#F4A261]/30 text-left">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#8E4E14] block">
+                Retirados por Seguridad
+              </span>
+              <div className="text-lg font-black text-[#191C1D] mt-0.5">
+                {discardedCount}
+              </div>
+              <span className="text-[10px] text-[#707973] block mt-0.5">
+                0 penalización en sesión/racha
+              </span>
+            </div>
+          </div>
+
+          {/* Incident details list if any */}
+          {allSafetyIncidents.length > 0 ? (
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#707973] block">
+                Registro de intervenciones articulares:
+              </span>
+              <div className="divide-y divide-[#EDEEEF] border border-[#EDEEEF] rounded-xl overflow-hidden text-left bg-[#F8F9FA]">
+                {allSafetyIncidents.slice(0, 5).map((inc) => (
+                  <div key={inc.id} className="p-3 text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-[#191C1D]">
+                        {inc.exerciseTitle}
+                      </span>
+                      <span
+                        className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+                          inc.action === 'sustituido_por_alternativa'
+                            ? 'bg-[#E7F3EC] text-[#0F5238]'
+                            : 'bg-[#FFF0E6] text-[#8E4E14]'
+                        }`}
+                      >
+                        {inc.action === 'sustituido_por_alternativa'
+                          ? 'Sustituido'
+                          : 'Retirado'}
+                      </span>
+                    </div>
+                    {inc.replacementExerciseTitle && (
+                      <p className="text-[11px] text-[#2D6A4F]">
+                        ↳ Reemplazado por: <strong>{inc.replacementExerciseTitle}</strong>
+                      </p>
+                    )}
+                    <p className="text-[10px] text-[#707973]">
+                      {inc.clinicalNote || inc.reason}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="p-2.5 rounded-xl bg-white border border-[#EDEEEF] text-center text-[11px] text-[#707973]">
+              Protocolo activo: Hasta la fecha no has requerido retirar ningún ejercicio por dolor agudo.
             </div>
           )}
         </section>

@@ -1,7 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { PRESET_AVATARS, UserAvatar } from '../components/UserAvatar';
-import { AvatarType, DayOfWeek, TrackingPreferences } from '../types';
+import {
+  AvatarType,
+  DayOfWeek,
+  TrackingPreferences,
+  BiologicalSex,
+  FitnessLevel,
+  HealthCondition,
+  EquipmentAvailableChoice,
+} from '../types';
 import { calculateBMI } from '../utils/anthropometry';
 import {
   X,
@@ -83,6 +91,36 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
     }
   );
 
+  const [biologicalSex, setBiologicalSex] = useState<BiologicalSex>(
+    userProfile.biologicalSex || 'Mujer'
+  );
+  const [fitnessLevel, setFitnessLevel] = useState<FitnessLevel>(
+    userProfile.fitnessLevel || 'Iniciación / Recuperación'
+  );
+  const [healthConditions, setHealthConditions] = useState<HealthCondition[]>(
+    userProfile.healthConditions && userProfile.healthConditions.length > 0
+      ? userProfile.healthConditions
+      : ['Ninguna']
+  );
+  const [equipmentAvailable, setEquipmentAvailable] = useState<EquipmentAvailableChoice>(
+    userProfile.equipmentAvailable || 'Solo peso corporal y silla'
+  );
+
+  const toggleCondition = (item: HealthCondition) => {
+    if (item === 'Ninguna') {
+      setHealthConditions(['Ninguna']);
+    } else {
+      let filtered = healthConditions.filter((c) => c !== 'Ninguna');
+      if (filtered.includes(item)) {
+        filtered = filtered.filter((c) => c !== item);
+        if (filtered.length === 0) filtered = ['Ninguna'];
+      } else {
+        filtered.push(item);
+      }
+      setHealthConditions(filtered);
+    }
+  };
+
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -134,6 +172,10 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       heightCm: !isNaN(parsedH) && parsedH > 0 ? Math.round(parsedH) : userProfile.heightCm,
       weightKg: !isNaN(parsedW) && parsedW > 0 ? Math.round(parsedW * 10) / 10 : userProfile.weightKg,
       trackingPreferences: trackingPrefs,
+      biologicalSex,
+      fitnessLevel,
+      healthConditions,
+      equipmentAvailable,
     });
 
     if (localDays.length === annualPlan.daysPerWeek) {
@@ -350,6 +392,142 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                 onChange={(e) => setWeight(e.target.value)}
                 className="w-full h-10 px-3 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF] text-[#191C1D] text-xs font-bold outline-hidden"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Clinical Profile & Adaptation Engine Config */}
+        <div className="pt-2 border-t border-[#EDEEEF] space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#2D6A4F]" />
+              <span>Perfil Clínico y Adaptación</span>
+            </span>
+            <span className="text-[10px] text-[#2D6A4F] font-bold bg-[#E7F3EC] px-2 py-0.5 rounded-md">
+              Reglas Activas
+            </span>
+          </div>
+
+          {/* Sexo Biológico */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-[#707973] block">
+              Sexo Biológico (Biomecánica)
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['Mujer', 'Hombre'] as BiologicalSex[]).map((sex) => (
+                <button
+                  key={sex}
+                  type="button"
+                  onClick={() => setBiologicalSex(sex)}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all text-center ${
+                    biologicalSex === sex
+                      ? 'bg-[#2D6A4F] text-white shadow-2xs'
+                      : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943] hover:bg-[#EDEEEF]'
+                  }`}
+                >
+                  {sex}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Nivel de Condición Física */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-[#707973] block">
+              Nivel de Condición Física
+            </label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(
+                [
+                  'Iniciación / Recuperación',
+                  'Moderado',
+                  'Activo habitual',
+                ] as FitnessLevel[]
+              ).map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setFitnessLevel(lvl)}
+                  className={`py-2 px-1 rounded-xl text-[10px] font-bold transition-all text-center leading-tight ${
+                    fitnessLevel === lvl
+                      ? 'bg-[#2D6A4F] text-white shadow-2xs'
+                      : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943] hover:bg-[#EDEEEF]'
+                  }`}
+                >
+                  {lvl === 'Iniciación / Recuperación' ? 'Iniciación' : lvl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Puntos Sensibles / Condiciones de Salud */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-[#707973] block">
+              Zonas de Protección Articular
+            </label>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(
+                [
+                  'Molestia lumbar',
+                  'Molestia en rodillas',
+                  'Molestia en hombros/cuello',
+                  'Problemas de equilibrio',
+                  'Ninguna',
+                ] as HealthCondition[]
+              ).map((cond) => {
+                const isSelected = healthConditions.includes(cond);
+                return (
+                  <button
+                    key={cond}
+                    type="button"
+                    onClick={() => toggleCondition(cond)}
+                    className={`py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all ${
+                      isSelected
+                        ? 'bg-[#E7F3EC] border border-[#B1F0CE] text-[#0F5238] font-bold'
+                        : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943]'
+                    }`}
+                  >
+                    <span>{cond}</span>
+                    <div
+                      className={`w-4 h-4 rounded-md flex items-center justify-center ${
+                        isSelected ? 'bg-[#2D6A4F] text-white' : 'border border-[#C4C8C5] bg-white'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Equipamiento Disponible */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-[#707973] block">
+              Equipamiento Disponible
+            </label>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(
+                [
+                  'Solo peso corporal y silla',
+                  'Bandas elásticas',
+                  'Mancuernas / Pesos',
+                ] as EquipmentAvailableChoice[]
+              ).map((eq) => (
+                <button
+                  key={eq}
+                  type="button"
+                  onClick={() => setEquipmentAvailable(eq)}
+                  className={`py-2 px-3 rounded-xl text-xs font-semibold text-left transition-all flex items-center justify-between ${
+                    equipmentAvailable === eq
+                      ? 'bg-[#2D6A4F] text-white font-bold shadow-2xs'
+                      : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943]'
+                  }`}
+                >
+                  <span>{eq}</span>
+                  {equipmentAvailable === eq && <Check className="w-3.5 h-3.5" />}
+                </button>
+              ))}
             </div>
           </div>
         </div>

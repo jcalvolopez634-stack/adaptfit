@@ -1456,3 +1456,218 @@ export const EXERCISES_DATABASE: CatalogExercise[] = [
     block: 'vuelta_a_la_calma',
   }),
 ];
+
+// ============================================================================
+// MOTOR DE ADAPTACIÓN INMEDIATA (BOTÓN DE PÁNICO)
+// Búsqueda inteligente de alternativas suaves del mismo patrón o grupo muscular
+// ============================================================================
+
+export interface SafeAlternativeOption extends CatalogExercise {
+  safetyReason: string;
+  benefitBadge: string;
+  iconType: 'chair' | 'feather' | 'wall' | 'bed';
+}
+
+export function findSafeAlternativesForExercise(
+  current: Exercise | CatalogExercise,
+  limit = 3
+): SafeAlternativeOption[] {
+  const currentId = current.id || '';
+  const currentTitle = (current.name || current.title || '').toLowerCase();
+  const currentPattern = current.movementPattern || 'dominante_rodilla';
+  const currentMuscle = (current.targetMuscleGroup || current.targetMuscles?.[0] || '').toLowerCase();
+
+  // Patrones motor prioritarios con variantes de menor impacto / cero cizalla
+  const specificMap: Record<string, string[]> = {
+    dominante_rodilla: [
+      'legs_05_glute_bridge',
+      'legs_01_seated_knee_extensions',
+      'legs_04_chair_squat_stand',
+      'legs_03_seated_band_abduction',
+    ],
+    dominante_cadera: [
+      'legs_05_glute_bridge',
+      'legs_03_seated_band_abduction',
+      'core_05_isometric_glute_core_bridge',
+    ],
+    empuje_horizontal: [
+      'push_02_wall_isometric',
+      'push_01_chair_chest_press',
+      'pull_01_seated_scapular_squeeze',
+    ],
+    empuje_vertical: [
+      'push_01_chair_chest_press',
+      'pull_03_wall_w_slides',
+      'pull_01_seated_scapular_squeeze',
+    ],
+    traccion_horizontal: [
+      'pull_01_seated_scapular_squeeze',
+      'pull_03_wall_w_slides',
+      'pull_02_seated_towel_row',
+    ],
+    traccion_vertical: [
+      'pull_03_wall_w_slides',
+      'pull_01_seated_scapular_squeeze',
+    ],
+    core_anti_extension: [
+      'core_01_seated_stomach_vacuum',
+      'core_05_isometric_glute_core_bridge',
+      'core_07_bird_dog',
+    ],
+    core_anti_rotacion: [
+      'core_01_seated_stomach_vacuum',
+      'core_07_bird_dog',
+      'core_05_isometric_glute_core_bridge',
+    ],
+  };
+
+  let priorityIds: string[] = [];
+  if (
+    currentTitle.includes('sentadilla') ||
+    currentTitle.includes('squat') ||
+    currentTitle.includes('zancada') ||
+    currentTitle.includes('lunge')
+  ) {
+    priorityIds = [
+      'legs_05_glute_bridge',
+      'legs_01_seated_knee_extensions',
+      'legs_04_chair_squat_stand',
+    ];
+  } else if (
+    currentTitle.includes('flexi') ||
+    currentTitle.includes('push') ||
+    currentTitle.includes('press')
+  ) {
+    priorityIds = [
+      'push_02_wall_isometric',
+      'push_01_chair_chest_press',
+      'pull_01_seated_scapular_squeeze',
+    ];
+  } else if (specificMap[currentPattern]) {
+    priorityIds = specificMap[currentPattern];
+  }
+
+  if (current.adaptedAlternativeId && current.adaptedAlternativeId !== currentId) {
+    priorityIds = [current.adaptedAlternativeId, ...priorityIds];
+  }
+
+  const matchedExercises: CatalogExercise[] = [];
+  const addedIds = new Set<string>();
+  addedIds.add(currentId);
+
+  // 1. Agregar desde prioridades específicas
+  for (const pid of priorityIds) {
+    if (addedIds.has(pid)) continue;
+    const found = EXERCISES_DATABASE.find((e) => e.id === pid);
+    if (found) {
+      matchedExercises.push(found);
+      addedIds.add(pid);
+    }
+  }
+
+  // 2. Si se requieren más, buscar en catálogo por patrón o músculo con impacto ZERO o terapéutico
+  if (matchedExercises.length < limit) {
+    const candidates = EXERCISES_DATABASE.filter((e) => {
+      if (addedIds.has(e.id)) return false;
+      const isZeroOrLow = e.impactLevel === 'ZERO' || e.impactLevel === 'LOW';
+      const isTherapeutic =
+        e.biomechanicalLevel === 'terapeutico_silla' ||
+        e.biomechanicalLevel === 'cero_impacto_suave';
+      const patternMatch = e.movementPattern === currentPattern;
+      const muscleMatch =
+        currentMuscle && e.targetMuscleGroup.toLowerCase().includes(currentMuscle);
+      return (patternMatch || muscleMatch) && (isZeroOrLow || isTherapeutic);
+    });
+
+    candidates.sort((a, b) => {
+      const aScore =
+        (a.impactLevel === 'ZERO' ? 3 : 1) +
+        (a.biomechanicalLevel === 'terapeutico_silla' ? 2 : 0);
+      const bScore =
+        (b.impactLevel === 'ZERO' ? 3 : 1) +
+        (b.biomechanicalLevel === 'terapeutico_silla' ? 2 : 0);
+      return bScore - aScore;
+    });
+
+    for (const c of candidates) {
+      if (matchedExercises.length >= limit) break;
+      matchedExercises.push(c);
+      addedIds.add(c.id);
+    }
+  }
+
+  // 3. Fallbacks universales de máxima seguridad articular
+  const generalFallbacks = [
+    'legs_05_glute_bridge',
+    'push_01_chair_chest_press',
+    'pull_01_seated_scapular_squeeze',
+    'legs_01_seated_knee_extensions',
+    'core_01_seated_stomach_vacuum',
+  ];
+  for (const fid of generalFallbacks) {
+    if (matchedExercises.length >= limit) break;
+    if (addedIds.has(fid)) continue;
+    const found = EXERCISES_DATABASE.find((e) => e.id === fid);
+    if (found) {
+      matchedExercises.push(found);
+      addedIds.add(fid);
+    }
+  }
+
+  return matchedExercises.slice(0, limit).map((ex) => {
+    let benefitBadge = 'Cero Impacto';
+    let iconType: 'chair' | 'feather' | 'wall' | 'bed' = 'feather';
+    let safetyReason =
+      'Movimiento adaptado que elimina la sobrecarga articular manteniendo la activación.';
+
+    if (
+      ex.biomechanicalLevel === 'terapeutico_silla' ||
+      ex.requiredEquipment.includes('silla_firme')
+    ) {
+      benefitBadge = 'Apoyo en Silla';
+      iconType = 'chair';
+      safetyReason =
+        'Soporte total en asiento firme: descarga articulaciones y columna lumbar.';
+    } else if (ex.requiredEquipment.includes('pared_libre')) {
+      benefitBadge = 'Apoyo en Pared';
+      iconType = 'wall';
+      safetyReason =
+        'Descarga el peso corporal contra la pared, reduciendo drásticamente la fuerza de cizalla.';
+    } else if (ex.id.includes('glute_bridge') || ex.id.includes('dead_bug')) {
+      benefitBadge = 'En Suelo / Cero Cizalla';
+      iconType = 'bed';
+      safetyReason =
+        'Soporte supino en suelo: elimina compresión axial en rodillas y columna.';
+    } else if (ex.impactLevel === 'ZERO') {
+      benefitBadge = 'Cero Impacto';
+      iconType = 'feather';
+      safetyReason =
+        'Protección biomecánica estricta para continuar el entreno sin ningún pinchazo.';
+    }
+
+    if (ex.id.includes('knee_extensions')) {
+      safetyReason =
+        'Elimina todo el soporte de peso en rodillas y rótula; trabaja cuádriceps sentado.';
+    } else if (ex.id.includes('glute_bridge')) {
+      safetyReason =
+        'Activa glúteos e isquiotibiales sin ninguna flexión extrema ni carga sobre las rodillas.';
+    } else if (ex.id.includes('scapular_squeeze')) {
+      safetyReason =
+        'Retracción escapular sin carga: activa la espalda alta y libera hombros y cuello de tensión.';
+    } else if (ex.id.includes('wall_isometric')) {
+      safetyReason =
+        'Isometría contra pared: fuerza de empuje sin flexión agresiva de muñecas ni hombros.';
+    } else if (ex.id.includes('chair_chest_press')) {
+      safetyReason =
+        'Empuje isométrico sentado: activa el pectoral sin mover articulaciones comprometidas.';
+    }
+
+    return {
+      ...ex,
+      benefitBadge,
+      iconType,
+      safetyReason,
+    };
+  });
+}
+

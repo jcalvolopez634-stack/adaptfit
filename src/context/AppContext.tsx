@@ -42,9 +42,15 @@ import {
   ExerciseSetRecord,
   AnthropometricRecord,
   TrackingPreferences,
+  JointSafetyIncident,
+  JointSafetyActionType,
+  BiologicalSex,
+  FitnessLevel,
+  HealthCondition,
+  EquipmentAvailableChoice,
 } from '../types';
 import { calculateBMI } from '../utils/anthropometry';
-import { EXERCISES_DATABASE } from '../data/exercisesData';
+import { EXERCISES_DATABASE, findSafeAlternativesForExercise, SafeAlternativeOption } from '../data/exercisesData';
 
 export const DEFAULT_TRACKING_PREFERENCES: TrackingPreferences = {
   trackWeightBMI: true,
@@ -1580,6 +1586,10 @@ export interface AppContextType {
   // User Profile & Onboarding
   userProfile: UserProfile;
   saveUserProfile: (profile: Partial<UserProfile>) => void;
+  setBiologicalSex: (sex: BiologicalSex) => void;
+  setFitnessLevel: (level: FitnessLevel) => void;
+  toggleHealthCondition: (condition: HealthCondition) => void;
+  setEquipmentAvailable: (equipment: EquipmentAvailableChoice) => void;
   toggleDiscomfortZone: (zone: JointDiscomfortZone) => void;
   setMobilityLevel: (level: MobilityLevelId) => void;
   toggleEquipment: (eq: AvailableEquipmentId) => void;
@@ -1614,6 +1624,10 @@ export interface AppContextType {
   openPanicReplacementModal: () => void;
   closePanicReplacementModal: () => void;
   replaceCurrentExercise: (alternativeId: string) => void;
+  replaceCurrentExerciseWithAlternative: (altExercise: Exercise, reason?: string) => void;
+  discardCurrentExerciseForSafety: (reason?: string) => void;
+  startBreathingPause: () => void;
+  stopBreathingPause: () => void;
   nextExercise: () => void;
   previousExercise: () => void;
   toggleAudioGuide: () => void;
@@ -1805,6 +1819,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             name: parsed.name || '',
             avatarType: parsed.avatarType || 'preset',
             avatarValue: parsed.avatarValue || 'avatar_sage',
+            biologicalSex: parsed.biologicalSex || 'Mujer',
+            fitnessLevel: parsed.fitnessLevel || 'Iniciación / Recuperación',
+            healthConditions: parsed.healthConditions || ['Ninguna'],
+            equipmentAvailable: parsed.equipmentAvailable || 'Solo peso corporal y silla',
             heightCm: parsed.heightCm,
             weightKg: parsed.weightKg,
             discomfortZones: parsed.discomfortZones || ['ninguna'],
@@ -1824,6 +1842,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       name: '',
       avatarType: 'preset',
       avatarValue: 'avatar_sage',
+      biologicalSex: 'Mujer',
+      fitnessLevel: 'Iniciación / Recuperación',
+      healthConditions: ['Ninguna'],
+      equipmentAvailable: 'Solo peso corporal y silla',
       heightCm: undefined,
       weightKg: undefined,
       discomfortZones: ['ninguna'],
@@ -2280,10 +2302,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   // User Profile Handlers
   const saveUserProfile = useCallback((profile: Partial<UserProfile>) => {
     setUserProfile((prev) => {
-      const updated = {
+      const updated: UserProfile = {
         ...prev,
         ...profile,
       };
+
+      // Automatic bi-directional synchronization for health conditions & discomfort zones
+      if (profile.healthConditions && !profile.discomfortZones) {
+        const mappedZones: JointDiscomfortZone[] = [];
+        if (profile.healthConditions.includes('Molestia en rodillas')) mappedZones.push('rodillas');
+        if (profile.healthConditions.includes('Molestia lumbar')) mappedZones.push('espalda_lumbar');
+        if (profile.healthConditions.includes('Molestia en hombros/cuello')) {
+          mappedZones.push('hombros');
+          mappedZones.push('cuello');
+        }
+        if (mappedZones.length === 0) mappedZones.push('ninguna');
+        updated.discomfortZones = mappedZones;
+      }
+
+      // Automatic bi-directional synchronization for equipment choice & available equipment list
+      if (profile.equipmentAvailable && !profile.availableEquipment) {
+        if (profile.equipmentAvailable === 'Solo peso corporal y silla') {
+          updated.availableEquipment = ['peso_corporal', 'silla_firme', 'pared_libre'];
+        } else if (profile.equipmentAvailable === 'Bandas elásticas') {
+          updated.availableEquipment = ['peso_corporal', 'silla_firme', 'pared_libre', 'bandas_elasticas'];
+        } else if (profile.equipmentAvailable === 'Mancuernas / Pesos') {
+          updated.availableEquipment = ['peso_corporal', 'silla_firme', 'pared_libre', 'bandas_elasticas', 'mancuernas'];
+        }
+      }
+
+      // Automatic synchronization for fitness level & mobility level
+      if (profile.fitnessLevel && !profile.mobilityLevel) {
+        if (profile.fitnessLevel === 'Iniciación / Recuperación') {
+          updated.mobilityLevel = 'cero_impacto';
+        } else if (profile.fitnessLevel === 'Moderado') {
+          updated.mobilityLevel = 'funcional_suave';
+        } else if (profile.fitnessLevel === 'Activo habitual') {
+          updated.mobilityLevel = 'avanzado_fuerza';
+        }
+      }
+
       if (profile.heightCm && profile.weightKg) {
         const assessment = calculateBMI(profile.weightKg, profile.heightCm);
         setAnthropometricRecords((prevRecords) => {
@@ -2304,6 +2362,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         });
       }
       return updated;
+    });
+  }, []);
+
+  const setBiologicalSex = useCallback((sex: BiologicalSex) => {
+    setUserProfile((prev) => ({ ...prev, biologicalSex: sex }));
+  }, []);
+
+  const setFitnessLevel = useCallback((level: FitnessLevel) => {
+    setUserProfile((prev) => {
+      let mobility: MobilityLevelId = prev.mobilityLevel;
+      if (level === 'Iniciación / Recuperación') mobility = 'cero_impacto';
+      else if (level === 'Moderado') mobility = 'funcional_suave';
+      else if (level === 'Activo habitual') mobility = 'avanzado_fuerza';
+      return { ...prev, fitnessLevel: level, mobilityLevel: mobility };
+    });
+  }, []);
+
+  const toggleHealthCondition = useCallback((condition: HealthCondition) => {
+    setUserProfile((prev) => {
+      let updatedConditions: HealthCondition[];
+      const current = prev.healthConditions || ['Ninguna'];
+
+      if (condition === 'Ninguna') {
+        updatedConditions = ['Ninguna'];
+      } else {
+        const withoutNone = current.filter((c) => c !== 'Ninguna');
+        if (withoutNone.includes(condition)) {
+          updatedConditions = withoutNone.filter((c) => c !== condition);
+          if (updatedConditions.length === 0) updatedConditions = ['Ninguna'];
+        } else {
+          updatedConditions = [...withoutNone, condition];
+        }
+      }
+
+      const newDiscomfortZones: JointDiscomfortZone[] = [];
+      if (updatedConditions.includes('Molestia en rodillas')) newDiscomfortZones.push('rodillas');
+      if (updatedConditions.includes('Molestia lumbar')) newDiscomfortZones.push('espalda_lumbar');
+      if (updatedConditions.includes('Molestia en hombros/cuello')) {
+        newDiscomfortZones.push('hombros');
+        newDiscomfortZones.push('cuello');
+      }
+      if (newDiscomfortZones.length === 0) newDiscomfortZones.push('ninguna');
+
+      return {
+        ...prev,
+        healthConditions: updatedConditions,
+        discomfortZones: newDiscomfortZones,
+      };
+    });
+  }, []);
+
+  const setEquipmentAvailable = useCallback((equipment: EquipmentAvailableChoice) => {
+    setUserProfile((prev) => {
+      let newEquipmentList: AvailableEquipmentId[] = ['peso_corporal', 'silla_firme', 'pared_libre'];
+      if (equipment === 'Bandas elásticas') {
+        newEquipmentList = ['peso_corporal', 'silla_firme', 'pared_libre', 'bandas_elasticas'];
+      } else if (equipment === 'Mancuernas / Pesos') {
+        newEquipmentList = ['peso_corporal', 'silla_firme', 'pared_libre', 'bandas_elasticas', 'mancuernas'];
+      }
+      return {
+        ...prev,
+        equipmentAvailable: equipment,
+        availableEquipment: newEquipmentList,
+      };
     });
   }, []);
 
@@ -2395,6 +2517,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       name: '',
       avatarType: 'preset',
       avatarValue: 'avatar_sage',
+      biologicalSex: 'Mujer',
+      fitnessLevel: 'Iniciación / Recuperación',
+      healthConditions: ['Ninguna'],
+      equipmentAvailable: 'Solo peso corporal y silla',
       discomfortZones: ['ninguna'],
       mobilityLevel: 'cero_impacto',
       availableEquipment: ['peso_corporal', 'silla_firme', 'pared_libre'],
@@ -2553,24 +2679,101 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       const isStandard =
         userProfile.mobilityLevel === 'saludable_estandar' && hasNoDiscomfort;
 
+      const conditions = userProfile.healthConditions || [];
+      const zones = userProfile.discomfortZones || [];
+
+      const hasKneeDiscomfort =
+        conditions.includes('Molestia en rodillas') ||
+        zones.includes('rodillas') ||
+        zones.includes('rodillas_piernas');
+
+      const hasLumbarDiscomfort =
+        conditions.includes('Molestia lumbar') ||
+        zones.includes('espalda_lumbar');
+
+      const hasShoulderDiscomfort =
+        conditions.includes('Molestia en hombros/cuello') ||
+        zones.includes('hombros') ||
+        zones.includes('cuello');
+
+      const hasBalanceIssues =
+        conditions.includes('Problemas de equilibrio');
+
+      const equipment = userProfile.equipmentAvailable || 'Solo peso corporal y silla';
+      const fitness = userProfile.fitnessLevel || 'Iniciación / Recuperación';
+      const sex = userProfile.biologicalSex || 'Mujer';
+
       const safePool = EXERCISES_DATABASE.filter((ex) => {
         if (isChair && ex.biomechanicalLevel !== 'terapeutico_silla') return false;
-        if (!hasNoDiscomfort) {
+
+        // Regla 1: Molestia en rodillas -> Excluir sentadillas libres profundas y ejercicios con carga patelofemoral
+        if (hasKneeDiscomfort) {
           if (
-            ex.contraindications &&
-            ex.contraindications.some((c) =>
-              userProfile.discomfortZones.includes(c)
-            )
-          ) {
-            return false;
-          }
-          if (
-            userProfile.discomfortZones.includes('rodillas_piernas') &&
-            ex.isKneeSafe === false
+            ex.id === 'legs_09_bodyweight_air_squats' ||
+            ex.id === 'legs_11_reverse_lunges' ||
+            ex.id === 'legs_12_bulgarian_split_squat' ||
+            ex.isKneeSafe === false ||
+            (ex.contraindications && ex.contraindications.includes('rodillas'))
           ) {
             return false;
           }
         }
+
+        // Regla 2: Molestia lumbar -> Neutralizar flexiones de tronco y cargas axiales agresivas
+        if (hasLumbarDiscomfort) {
+          if (
+            ex.id === 'legs_10_dumbbell_romanian_deadlift' ||
+            ex.id === 'core_03_seated_russian_twists' ||
+            ex.id === 'pull_11_renegade_row' ||
+            (ex.contraindications && ex.contraindications.includes('espalda_lumbar'))
+          ) {
+            return false;
+          }
+        }
+
+        // Regla 3: Molestia en hombros/cuello -> Mantener movimientos por debajo de la línea horizontal
+        if (hasShoulderDiscomfort) {
+          if (
+            ex.movementPattern === 'empuje_vertical' ||
+            ex.movementPattern === 'traccion_vertical' ||
+            ex.id === 'pull_05_overhead_band_lat_pulldown' ||
+            ex.id === 'pull_07_standing_band_face_pull' ||
+            ex.id === 'pull_10_dumbbell_bent_over_reverse_flyes' ||
+            (ex.contraindications && (ex.contraindications.includes('hombros') || ex.contraindications.includes('cuello')))
+          ) {
+            return false;
+          }
+        }
+
+        // Regla 4: Equipamiento disponible
+        if (equipment === 'Solo peso corporal y silla') {
+          if (ex.requiredEquipment.includes('bandas_elasticas') || ex.requiredEquipment.includes('mancuernas')) {
+            return false;
+          }
+        } else if (equipment === 'Bandas elásticas') {
+          if (ex.requiredEquipment.includes('mancuernas')) {
+            return false;
+          }
+        }
+
+        // Regla 5: Problemas de equilibrio -> Excluir apoyos inestables sin soporte
+        if (hasBalanceIssues) {
+          if (
+            ex.biomechanicalLevel === 'avanzado_fuerza' &&
+            !ex.requiredEquipment.includes('pared_libre') &&
+            !ex.requiredEquipment.includes('silla_firme')
+          ) {
+            return false;
+          }
+        }
+
+        // Filtro general de contraindicaciones declaradas
+        if (!hasNoDiscomfort && ex.contraindications) {
+          if (ex.contraindications.some((c) => zones.includes(c))) {
+            return false;
+          }
+        }
+
         return true;
       });
 
@@ -2602,6 +2805,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       const calmExercises = sourcePool.filter(
         (e) => e.block === 'vuelta_a_la_calma'
       );
+
+      // INYECCIÓN CLÍNICA PRIORITARIA SEGÚN REGLAS MÉDICAS:
+      if (hasKneeDiscomfort) {
+        // Prescribir sentadilla a silla alta y puente glúteo en suelo
+        const chairSquat = EXERCISES_DATABASE.find((e) => e.id === 'legs_04_chair_squat_stand');
+        const gluteBridge = EXERCISES_DATABASE.find((e) => e.id === 'legs_05_glute_bridge');
+        if (chairSquat && !legExercises.some((e) => e.id === chairSquat.id)) legExercises.unshift(chairSquat);
+        if (gluteBridge && !legExercises.some((e) => e.id === gluteBridge.id)) legExercises.unshift(gluteBridge);
+      }
+
+      if (hasLumbarDiscomfort) {
+        // Priorizar estabilización de cadera y pared
+        const chairPlank = EXERCISES_DATABASE.find((e) => e.id === 'core_06_incline_chair_plank');
+        const wallPush = EXERCISES_DATABASE.find((e) => e.id === 'push_02_wall_isometric');
+        const gluteBridge = EXERCISES_DATABASE.find((e) => e.id === 'legs_05_glute_bridge');
+        if (chairPlank && !coreExercises.some((e) => e.id === chairPlank.id)) coreExercises.unshift(chairPlank);
+        if (wallPush && !pushExercises.some((e) => e.id === wallPush.id)) pushExercises.unshift(wallPush);
+        if (gluteBridge && !legExercises.some((e) => e.id === gluteBridge.id)) legExercises.unshift(gluteBridge);
+      }
+
+      if (hasShoulderDiscomfort) {
+        // Prescribir retracción isométrica baja
+        const scapularSqueeze = EXERCISES_DATABASE.find((e) => e.id === 'pull_01_seated_scapular_squeeze');
+        const towelRow = EXERCISES_DATABASE.find((e) => e.id === 'pull_02_seated_towel_row');
+        if (scapularSqueeze && !pullExercises.some((e) => e.id === scapularSqueeze.id)) pullExercises.unshift(scapularSqueeze);
+        if (towelRow && !pullExercises.some((e) => e.id === towelRow.id)) pullExercises.unshift(towelRow);
+      }
 
       const pickItem = (list: Exercise[], offset: number): Exercise => {
         const listToUse = list.length > 0 ? list : sourcePool;
@@ -2662,14 +2892,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       let title = 'Fuerza Biomecánica y Salud Funcional';
-      if (isChair) {
+      if (hasKneeDiscomfort) {
+        title = 'Protección Articular de Rodilla y Cadera';
+      } else if (hasLumbarDiscomfort) {
+        title = 'Estabilidad Lumbo-Pélvica y Descompresión';
+      } else if (hasShoulderDiscomfort) {
+        title = 'Control Escapular Seguro y Retracción Baja';
+      } else if (isChair) {
         title = 'Movilidad y Fuerza Terapéutica Asistida en Silla';
       } else if (isAdvanced) {
-        title = 'Fuerza Progresiva y Tensión Mecánica (Avanzado)';
+        title = 'Fuerza Progresiva y Tensión Mecánica';
       } else if (isStandard) {
         title = 'Fuerza Funcional y Acondicionamiento Activo';
       } else {
-        title = 'Fortalecimiento Progresivo Cero Impacto Articular';
+        title = 'Fortalecimiento Progresivo Cero Impacto';
+      }
+
+      if (sex === 'Mujer') {
+        title += ' (Estabilidad Pélvica)';
+      } else {
+        title += ' (Cadena Posterior)';
       }
 
       const defaultIntensity: WorkoutIntensityMode = isAdvanced
@@ -2688,6 +2930,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       annualPlan.minutesPerSession,
       userProfile.discomfortZones,
       userProfile.mobilityLevel,
+      userProfile.healthConditions,
+      userProfile.fitnessLevel,
+      userProfile.equipmentAvailable,
+      userProfile.biologicalSex,
     ]
   );
 
@@ -2696,6 +2942,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     (isLowEnergy = false) => {
       const generated = generateDailyWorkout(isLowEnergy);
       const firstExercise = generated.exercises[0];
+
+      // Adaptación de descansos y cargas según fitnessLevel y equipamiento
+      const fitness = userProfile.fitnessLevel || 'Iniciación / Recuperación';
+      const equipment = userProfile.equipmentAvailable || 'Solo peso corporal y silla';
+
+      const restTime = fitness === 'Iniciación / Recuperación' ? 60 : fitness === 'Activo habitual' ? 35 : 45;
+      const targetReps = fitness === 'Iniciación / Recuperación' ? 8 : fitness === 'Activo habitual' ? 12 : 10;
+      const targetWeight =
+        fitness === 'Activo habitual' && equipment === 'Mancuernas / Pesos'
+          ? 4
+          : fitness === 'Moderado' && equipment === 'Mancuernas / Pesos'
+          ? 2
+          : 0;
 
       setActiveWorkout({
         isSessionActive: true,
@@ -2715,10 +2974,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         totalSets: 3,
         secondsRemaining: 0, // Cronómetro DETENIDO en 0
         isPlaying: false,    // DETENIDO
-        restSecondsRemaining: 45,
-        configuredRestDuration: 45,
-        currentSetRepsInput: 10,
-        currentSetWeightKgInput: 0,
+        restSecondsRemaining: restTime,
+        configuredRestDuration: restTime,
+        currentSetRepsInput: targetReps,
+        currentSetWeightKgInput: targetWeight,
         recordedSets: {},
         isAudioGuideActive: true,
         selectedStepIndex: 0,
@@ -2736,6 +2995,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       generateDailyWorkout,
       completedWorkouts,
       annualPlan.minutesPerSession,
+      userProfile.fitnessLevel,
+      userProfile.equipmentAvailable,
       setActiveTab,
       navigateTo,
     ]
@@ -2979,74 +3240,219 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // Panic Button: Change exercise immediately with a low-impact alternative
-  const replaceCurrentExercise = useCallback((alternativeId: string) => {
+  const replaceCurrentExerciseWithAlternative = useCallback(
+    (altExercise: Exercise, reason?: string) => {
+      setActiveWorkout((prev) => {
+        const prevEx = prev.currentExercise;
+        const currentIdx = prev.exerciseIndex;
+        const updatedList = [...prev.workoutList];
+        updatedList[currentIdx] = altExercise;
+
+        const incident: JointSafetyIncident = {
+          id: `incident-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          timestamp: new Date().toISOString(),
+          exerciseId: prevEx.id,
+          exerciseTitle: prevEx.name || prevEx.title || 'Ejercicio en curso',
+          action: 'sustituido_por_alternativa',
+          replacementExerciseId: altExercise.id,
+          replacementExerciseTitle: altExercise.name || altExercise.title,
+          movementPattern: prevEx.movementPattern,
+          targetMuscleGroup: prevEx.targetMuscleGroup,
+          reason:
+            reason ||
+            'Sustitución inmediata por molestia o pinchazo articular para preservar la seguridad.',
+          clinicalNote: `Sustituido por "${altExercise.name || altExercise.title}". Retirado de forma preventiva sin computar como molestia tolerada.`,
+        };
+
+        return {
+          ...prev,
+          currentExercise: altExercise,
+          workoutList: updatedList,
+          executionPhase: 'PREPARATION',
+          currentSet: 1,
+          totalSets: 3,
+          secondsRemaining: 0,
+          isPlaying: false,
+          isPanicModalOpen: false,
+          isBreathingPauseActive: false,
+          selectedStepIndex: 0,
+          currentSetRepsInput: 10,
+          currentSetWeightKgInput: 0,
+          safetyIncidents: [...(prev.safetyIncidents || []), incident],
+        };
+      });
+    },
+    []
+  );
+
+  const discardCurrentExerciseForSafety = useCallback((reason?: string) => {
     setActiveWorkout((prev) => {
-      const alt = prev.currentExercise.alternatives.find(
-        (a) => a.id === alternativeId
-      );
-      if (!alt) return { ...prev, isPanicModalOpen: false };
+      const prevEx = prev.currentExercise;
+      const currentIdx = prev.exerciseIndex;
+      const remainingList = prev.workoutList.filter((_, idx) => idx !== currentIdx);
 
-      // Build safe substitute on the fly
-      const substituteExercise: Exercise = {
-        ...prev.currentExercise,
-        id: `replaced-${alt.id}`,
-        title: alt.title,
-        subtitle: `${alt.subtitle} • Reemplazo activo sin dolor`,
-        durationSeconds: 45,
-        steps: [
-          {
-            stepIndex: 0,
-            stepShortName: 'Postura',
-            title: 'Posición de Apoyo Seguro',
-            description: `Acomódate en posición estable: ${alt.reason}`,
-            visualAlt: 'Alternativa adaptada con cero dolor.',
-            previewUrl:
-              'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=600&q=80',
-          },
-          {
-            stepIndex: 1,
-            stepShortName: 'Ejecutar',
-            title: 'Movimiento Suave',
-            description:
-              'Realiza el movimiento con suavidad asegurando cero tensión articular.',
-            visualAlt: 'Movimiento suave y fluido.',
-            previewUrl:
-              'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=600&q=80',
-          },
-          {
-            stepIndex: 2,
-            stepShortName: 'Sostener',
-            title: 'Control Isométrico',
-            description: 'Mantén la activación sin forzar articulaciones.',
-            visualAlt: 'Control isométrico relajado.',
-            previewUrl:
-              'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=600&q=80',
-          },
-          {
-            stepIndex: 3,
-            stepShortName: 'Respirar',
-            title: 'Pausa y Calma',
-            description: 'Inhala hondo y exhala despacio.',
-            visualAlt: 'Respiración sosegada.',
-            previewUrl:
-              'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=600&q=80',
-          },
-        ],
+      const incident: JointSafetyIncident = {
+        id: `incident-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        exerciseId: prevEx.id,
+        exerciseTitle: prevEx.name || prevEx.title || 'Ejercicio en curso',
+        action: 'descartado_seguridad',
+        movementPattern: prevEx.movementPattern,
+        targetMuscleGroup: prevEx.targetMuscleGroup,
+        reason:
+          reason ||
+          'Ejercicio retirado de la rutina de hoy por seguridad articular tras molestia o pinchazo.',
+        clinicalNote:
+          'Ejercicio retirado por seguridad articular. No se computa como dolor tolerado y se protege la articulación sin penalizar la sesión ni la racha.',
       };
 
-      return {
-        ...prev,
-        currentExercise: substituteExercise,
-        executionPhase: 'PREPARATION',
-        currentSet: 1,
-        totalSets: 3,
-        secondsRemaining: 0,
-        isPlaying: false,
-        isPanicModalOpen: false,
-        selectedStepIndex: 0,
-      };
+      const updatedIncidents = [...(prev.safetyIncidents || []), incident];
+
+      if (remainingList.length > 0) {
+        const nextIdx = Math.min(currentIdx, remainingList.length - 1);
+        const nextEx = remainingList[nextIdx];
+
+        return {
+          ...prev,
+          workoutList: remainingList,
+          exerciseIndex: nextIdx,
+          currentExercise: nextEx,
+          executionPhase: 'PREPARATION',
+          currentSet: 1,
+          totalSets: 3,
+          secondsRemaining: 0,
+          isPlaying: false,
+          isPanicModalOpen: false,
+          isBreathingPauseActive: false,
+          selectedStepIndex: 0,
+          safetyIncidents: updatedIncidents,
+        };
+      } else {
+        return {
+          ...prev,
+          workoutList: [],
+          isSessionActive: false,
+          isPlaying: false,
+          isPanicModalOpen: false,
+          isBreathingPauseActive: false,
+          safetyIncidents: updatedIncidents,
+        };
+      }
     });
   }, []);
+
+  const startBreathingPause = useCallback(() => {
+    setActiveWorkout((prev) => ({
+      ...prev,
+      isPlaying: false,
+      isBreathingPauseActive: true,
+    }));
+  }, []);
+
+  const stopBreathingPause = useCallback(() => {
+    setActiveWorkout((prev) => ({
+      ...prev,
+      isBreathingPauseActive: false,
+    }));
+  }, []);
+
+  const replaceCurrentExercise = useCallback(
+    (alternativeId: string) => {
+      const catalogFound = EXERCISES_DATABASE.find((e) => e.id === alternativeId);
+      if (catalogFound) {
+        replaceCurrentExerciseWithAlternative(catalogFound);
+        return;
+      }
+
+      setActiveWorkout((prev) => {
+        const alt = prev.currentExercise.alternatives.find(
+          (a) => a.id === alternativeId
+        );
+        if (!alt) return { ...prev, isPanicModalOpen: false };
+
+        const substituteExercise: Exercise = {
+          ...prev.currentExercise,
+          id: `replaced-${alt.id}`,
+          title: alt.title,
+          subtitle: `${alt.subtitle} • Reemplazo activo sin dolor`,
+          durationSeconds: 45,
+          steps: [
+            {
+              stepIndex: 0,
+              stepShortName: 'Postura',
+              title: 'Posición de Apoyo Seguro',
+              description: `Acomódate en posición estable: ${alt.reason}`,
+              visualAlt: 'Alternativa adaptada con cero dolor.',
+              previewUrl:
+                'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=600&q=80',
+            },
+            {
+              stepIndex: 1,
+              stepShortName: 'Ejecutar',
+              title: 'Movimiento Suave',
+              description:
+                'Realiza el movimiento con suavidad asegurando cero tensión articular.',
+              visualAlt: 'Movimiento suave y fluido.',
+              previewUrl:
+                'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=600&q=80',
+            },
+            {
+              stepIndex: 2,
+              stepShortName: 'Sostener',
+              title: 'Control Isométrico',
+              description: 'Mantén la activación sin forzar articulaciones.',
+              visualAlt: 'Control isométrico relajado.',
+              previewUrl:
+                'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=600&q=80',
+            },
+            {
+              stepIndex: 3,
+              stepShortName: 'Respirar',
+              title: 'Pausa y Calma',
+              description: 'Inhala hondo y exhala despacio.',
+              visualAlt: 'Respiración sosegada.',
+              previewUrl:
+                'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=600&q=80',
+            },
+          ],
+        };
+
+        const incident: JointSafetyIncident = {
+          id: `incident-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          timestamp: new Date().toISOString(),
+          exerciseId: prev.currentExercise.id,
+          exerciseTitle: prev.currentExercise.name || prev.currentExercise.title,
+          action: 'sustituido_por_alternativa',
+          replacementExerciseId: substituteExercise.id,
+          replacementExerciseTitle: substituteExercise.title,
+          movementPattern: prev.currentExercise.movementPattern,
+          targetMuscleGroup: prev.currentExercise.targetMuscleGroup,
+          reason: 'Sustitución inmediata por molestia articular para preservar la seguridad.',
+          clinicalNote: `Sustituido por "${substituteExercise.title}". Retirado de forma preventiva sin computar como molestia tolerada.`,
+        };
+
+        const currentIdx = prev.exerciseIndex;
+        const updatedList = [...prev.workoutList];
+        updatedList[currentIdx] = substituteExercise;
+
+        return {
+          ...prev,
+          currentExercise: substituteExercise,
+          workoutList: updatedList,
+          executionPhase: 'PREPARATION',
+          currentSet: 1,
+          totalSets: 3,
+          secondsRemaining: 0,
+          isPlaying: false,
+          isPanicModalOpen: false,
+          isBreathingPauseActive: false,
+          selectedStepIndex: 0,
+          safetyIncidents: [...(prev.safetyIncidents || []), incident],
+        };
+      });
+    },
+    [replaceCurrentExerciseWithAlternative]
+  );
 
   const nextExercise = useCallback(() => {
     setActiveWorkout((prev) => {
@@ -3264,6 +3670,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         discomfortNotes: extra?.discomfortNotes,
         volumeTotalKg: extra?.volumeTotalKg || (calculatedVolume > 0 ? calculatedVolume : undefined),
         exercisesCompleted: executedExercises,
+        safetyIncidents: activeWorkout.safetyIncidents || [],
       };
 
       setCompletedWorkouts((prev) => [newWorkout, ...prev]);
@@ -3445,6 +3852,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       goBack,
       userProfile,
       saveUserProfile,
+      setBiologicalSex,
+      setFitnessLevel,
+      toggleHealthCondition,
+      setEquipmentAvailable,
       toggleDiscomfortZone,
       setMobilityLevel,
       toggleEquipment,
@@ -3471,6 +3882,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       openPanicReplacementModal,
       closePanicReplacementModal,
       replaceCurrentExercise,
+      replaceCurrentExerciseWithAlternative,
+      discardCurrentExerciseForSafety,
+      startBreathingPause,
+      stopBreathingPause,
       nextExercise,
       previousExercise,
       toggleAudioGuide,
@@ -3552,6 +3967,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       openPanicReplacementModal,
       closePanicReplacementModal,
       replaceCurrentExercise,
+      replaceCurrentExerciseWithAlternative,
+      discardCurrentExerciseForSafety,
+      startBreathingPause,
+      stopBreathingPause,
       nextExercise,
       previousExercise,
       toggleAudioGuide,

@@ -1,109 +1,163 @@
 /**
- * AdaptFit - Pantalla 1: Onboarding Clínico y Limitaciones Articulares
- * Módulo de evaluación inicial: zonas de molestia articular, nivel de movilidad y equipamiento en casa.
+ * AdaptFit - Pantalla de Onboarding: Evaluación Clínica y Motor de Adaptación
+ * Registra sexo biológico, nivel de condición física, condiciones articulares y equipamiento.
  */
 
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
-  JointDiscomfortZone,
-  MobilityLevelId,
-  AvailableEquipmentId,
+  BiologicalSex,
+  FitnessLevel,
+  HealthCondition,
+  EquipmentAvailableChoice,
 } from '../types';
 import { calculateBMI } from '../utils/anthropometry';
 import {
   Shield,
-  Armchair,
-  Feather,
-  Accessibility,
-  Activity,
-  Dumbbell,
   Check,
   ArrowRight,
+  Activity,
+  Dumbbell,
   Sparkles,
-  Info,
-  Layers,
   HeartHandshake,
   Scale,
   Ruler,
+  Info,
+  CheckSquare,
+  Square,
+  ShieldCheck,
+  User,
 } from 'lucide-react';
 
-const DISCOMFORT_OPTIONS: { id: JointDiscomfortZone; label: string; description: string }[] = [
-  { id: 'rodillas', label: 'Rodillas', description: 'Molestia al flexionar o subir escaleras' },
-  { id: 'espalda_lumbar', label: 'Espalda lumbar', description: 'Rigidez o dolor en zona baja' },
-  { id: 'hombros', label: 'Hombros', description: 'Limitación al elevar los brazos' },
-  { id: 'cuello', label: 'Cuello y cervicales', description: 'Tensión acumulada en trapecios' },
-  { id: 'cadera', label: 'Cadera', description: 'Molestia al caminar o levantarse' },
-  { id: 'munecas', label: 'Muñecas', description: 'Sensibilidad al apoyar peso' },
-  { id: 'ninguna', label: 'Ninguna molestia (Sin dolor)', description: 'Articulaciones libres para exigencia física' },
-];
-
-const MOBILITY_LEVELS: {
-  id: MobilityLevelId;
-  order: string;
-  title: string;
-  subtitle: string;
+const BIOLOGICAL_SEX_OPTIONS: {
+  id: BiologicalSex;
+  label: string;
   badge: string;
-  icon: React.ElementType;
+  description: string;
 }[] = [
   {
-    id: 'silla_cama',
-    order: 'Nivel 1',
-    title: 'En silla o cama',
-    subtitle: 'Movilidad muy reducida con apoyo total. Cero peso soportado por articulaciones.',
-    badge: 'Máximo Cuidado',
-    icon: Armchair,
+    id: 'Mujer',
+    label: 'Mujer',
+    badge: 'Estabilidad Pélvica',
+    description:
+      'Ajuste biomecánico: mayor énfasis en alineación lumbopélvica, activación de glúteo medio y prevención de valgo dinámico de rodilla.',
   },
   {
-    id: 'cero_impacto',
-    order: 'Nivel 2',
-    title: 'Cero impacto articular',
-    subtitle: 'Movimientos suaves de pie o sentado sin saltos ni giros bruscos. Máxima protección.',
-    badge: 'Protección Total',
-    icon: Feather,
-  },
-  {
-    id: 'funcional_suave',
-    order: 'Nivel 3',
-    title: 'Funcional suave / Principiante',
-    subtitle: 'Soporte asistido para equilibrio, fortalecimiento suave y confianza postural.',
-    badge: 'Principiante',
-    icon: Accessibility,
-  },
-  {
-    id: 'saludable_estandar',
-    order: 'Nivel 4',
-    title: 'Saludable estándar',
-    subtitle: 'Fuerza media, resistencia cardiovascular y acondicionamiento físico activo.',
-    badge: 'Fuerza Media',
-    icon: Activity,
-  },
-  {
-    id: 'avanzado_fuerza',
-    order: 'Nivel 5',
-    title: 'Avanzado / Ponerse fuerte',
-    subtitle: 'Sobrecarga progresiva, hipertrofia muscular, flexiones y zancadas búlgaras.',
-    badge: 'Alta Intensidad',
-    icon: Dumbbell,
+    id: 'Hombre',
+    label: 'Hombre',
+    badge: 'Cadena Posterior',
+    description:
+      'Ajuste biomecánico: descompresión de columna, elongación y movilidad de isquiosurales con protección lumbosacra.',
   },
 ];
 
-const EQUIPMENT_OPTIONS: { id: AvailableEquipmentId; label: string; icon: string }[] = [
-  { id: 'peso_corporal', label: 'Solo peso corporal', icon: '✨' },
-  { id: 'silla_firme', label: 'Silla firme', icon: '🪑' },
-  { id: 'pared_libre', label: 'Pared libre', icon: '🧱' },
-  { id: 'esterilla', label: 'Esterilla o alfombra', icon: '🧘' },
-  { id: 'bandas_elasticas', label: 'Bandas elásticas', icon: '🎗️' },
-  { id: 'mancuernas', label: 'Mancuernas / Peso', icon: '🏋️' },
+const FITNESS_LEVEL_OPTIONS: {
+  id: FitnessLevel;
+  label: string;
+  badge: string;
+  repsDesc: string;
+  description: string;
+}[] = [
+  {
+    id: 'Iniciación / Recuperación',
+    label: 'Iniciación / Recuperación',
+    badge: 'Cuidado Máximo',
+    repsDesc: '8 reps • 60s descanso',
+    description:
+      'Ideal si hace tiempo no entrenas, tienes miedo a lesionarte o sales de un periodo de inactividad o dolor.',
+  },
+  {
+    id: 'Moderado',
+    label: 'Moderado',
+    badge: 'Equilibrio Funcional',
+    repsDesc: '10 reps • 45s descanso',
+    description:
+      'Capacidad para realizar movimientos cotidianos sin fatiga extrema; buscas tono muscular y articulaciones firmes.',
+  },
+  {
+    id: 'Activo habitual',
+    label: 'Activo habitual',
+    badge: 'Fuerza Progresiva',
+    repsDesc: '12 reps • 35s descanso',
+    description:
+      'Acostumbrado a moverte a diario; buscas estímulo de fuerza funcional con tensión mecánica y mayor dinamismo.',
+  },
+];
+
+const HEALTH_CONDITIONS_OPTIONS: {
+  id: HealthCondition;
+  label: string;
+  clinicalRule: string;
+}[] = [
+  {
+    id: 'Molestia lumbar',
+    label: 'Molestia lumbar',
+    clinicalRule:
+      'Neutraliza flexiones de tronco; prioriza estabilización de cadera y pared.',
+  },
+  {
+    id: 'Molestia en rodillas',
+    label: 'Molestia en rodillas',
+    clinicalRule:
+      'Excluye sentadillas libres profundas; prescribe sentadilla a silla alta y puente glúteo en suelo.',
+  },
+  {
+    id: 'Molestia en hombros/cuello',
+    label: 'Molestia en hombros/cuello',
+    clinicalRule:
+      'Mantiene movimientos por debajo de la horizontal del hombro (retracción isométrica baja).',
+  },
+  {
+    id: 'Problemas de equilibrio',
+    label: 'Problemas de equilibrio',
+    clinicalRule:
+      'Asegura apoyo asistido permanente con silla firme o pared; descarta apoyos inestables.',
+  },
+  {
+    id: 'Ninguna',
+    label: 'Ninguna molestia',
+    clinicalRule:
+      'Articulaciones libres; prescripción sin restricciones preventivas especiales.',
+  },
+];
+
+const EQUIPMENT_CHOICES: {
+  id: EquipmentAvailableChoice;
+  label: string;
+  icon: string;
+  description: string;
+}[] = [
+  {
+    id: 'Solo peso corporal y silla',
+    label: 'Solo peso corporal y silla',
+    icon: '🪑',
+    description:
+      'Todo guiado con tu propio cuerpo, una silla firme de casa y apoyo en pared.',
+  },
+  {
+    id: 'Bandas elásticas',
+    label: 'Bandas elásticas',
+    icon: '🎗️',
+    description:
+      'Resistencia progresiva suave, sin aceleraciones bruscas ni impacto articular.',
+  },
+  {
+    id: 'Mancuernas / Pesos',
+    label: 'Mancuernas / Pesos',
+    icon: '🏋️',
+    description:
+      'Sobrecarga con mancuernas ligeras (1 a 4 kg) o botellas de agua.',
+  },
 ];
 
 export const OnboardingClinicalScreen: React.FC = () => {
   const {
     userProfile,
     saveUserProfile,
-    toggleDiscomfortZone,
-    setMobilityLevel,
-    toggleEquipment,
+    setBiologicalSex,
+    setFitnessLevel,
+    toggleHealthCondition,
+    setEquipmentAvailable,
     navigateTo,
   } = useApp();
 
@@ -135,14 +189,15 @@ export const OnboardingClinicalScreen: React.FC = () => {
         weightKg: Math.round(parsedWeight * 10) / 10,
       });
     }
-    // Navigate to step 2 (macrocycle)
+    // Navegar al siguiente paso del onboarding
     navigateTo('onboarding_macrocycle');
   };
 
   const isFormValid =
-    userProfile.discomfortZones.length > 0 &&
-    Boolean(userProfile.mobilityLevel) &&
-    userProfile.availableEquipment.length > 0;
+    Boolean(userProfile.biologicalSex) &&
+    Boolean(userProfile.fitnessLevel) &&
+    (userProfile.healthConditions || []).length > 0 &&
+    Boolean(userProfile.equipmentAvailable);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#191C1D] flex flex-col justify-between max-w-md mx-auto shadow-2xl border-x border-[#E1E3E4] font-sans pb-28">
@@ -154,158 +209,152 @@ export const OnboardingClinicalScreen: React.FC = () => {
               AF
             </span>
             <span className="text-xs font-bold uppercase tracking-wider text-[#2D6A4F]">
-              Evaluación Adaptada
+              Evaluación Clínica
             </span>
           </div>
-          <div className="flex items-center gap-1.5 bg-[#EDEEEF] px-3 py-1 rounded-full">
-            <span className="text-xs font-bold text-[#2D6A4F]">Paso 1</span>
-            <span className="text-xs text-[#707973]">de 2</span>
+          <div className="flex items-center gap-1.5 bg-[#E7F3EC] px-3 py-1 rounded-full">
+            <span className="text-xs font-bold text-[#0F5238]">Paso 2</span>
+            <span className="text-xs text-[#707973]">de 3</span>
           </div>
         </div>
 
         {/* Progress bar track */}
         <div className="w-full bg-[#EDEEEF] h-1.5 rounded-full overflow-hidden">
-          <div className="bg-[#2D6A4F] h-full w-1/2 rounded-full transition-all duration-500" />
+          <div className="bg-[#2D6A4F] h-full w-2/3 rounded-full transition-all duration-500" />
         </div>
       </header>
 
       {/* Main Form Body */}
-      <main className="px-5 pt-6 space-y-8 flex-1">
+      <main className="px-5 pt-6 space-y-7 flex-1">
         {/* Title Header */}
         <section className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#B1F0CE]/50 text-[#0F5238] text-xs font-semibold">
-            <HeartHandshake className="w-3.5 h-3.5 text-[#0F5238]" />
-            <span>Entrenamiento 100% Respetuoso con tu Cuerpo</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E7F3EC] text-[#0F5238] text-xs font-semibold">
+            <HeartHandshake className="w-3.5 h-3.5 text-[#2D6A4F]" />
+            <span>Prescripción Médica y Biomecánica Personalizada</span>
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-[#191C1D] leading-tight font-headline">
-            Cuéntanos tus necesidades articulares
+          <h1 className="text-2xl font-black tracking-tight text-[#191C1D] leading-tight">
+            Configuración de tu Perfil de Seguridad
           </h1>
-          <p className="text-sm text-[#404943] leading-relaxed">
-            Adaptamos cada ejercicio a tus puntos sensibles para que entrenes con absoluta confianza, sin impacto ni miedo al dolor.
+          <p className="text-xs text-[#525B54] leading-relaxed">
+            Estos parámetros alimentan el motor clínico inteligente de AdaptFit para prescribir tus ejercicios con cero impacto y protección de zonas sensibles.
           </p>
         </section>
 
-        {/* Section 1: Zonas de molestia articular */}
-        <section className="space-y-3.5">
+        {/* 1. Sexo Biológico */}
+        <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
-              <Shield className="w-4 h-4 text-[#2D6A4F]" />
-              <span>1. Zonas de molestia o rigidez</span>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
+              <User className="w-4 h-4 text-[#2D6A4F]" />
+              <span>1. Sexo Biológico</span>
             </h2>
-            <span className="text-xs text-[#707973]">Multiselección</span>
+            <span className="text-[11px] text-[#707973]">Consideración biomecánica</span>
           </div>
           <p className="text-xs text-[#707973]">
-            Marca las articulaciones que necesitan máxima protección en tus sesiones:
+            Ajusta los vectores de fuerza pélvica, rodilla y alineación raquídea:
           </p>
 
-          <div className="grid grid-cols-1 gap-2">
-            {DISCOMFORT_OPTIONS.map((opt) => {
-              const isSelected = userProfile.discomfortZones.includes(opt.id);
-              const isNone = opt.id === 'ninguna';
-
+          <div className="grid grid-cols-2 gap-3">
+            {BIOLOGICAL_SEX_OPTIONS.map((opt) => {
+              const isSelected = userProfile.biologicalSex === opt.id;
               return (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => toggleDiscomfortZone(opt.id)}
-                  className={`w-full text-left p-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between ${
+                  onClick={() => setBiologicalSex(opt.id)}
+                  className={`p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between min-h-[120px] ${
                     isSelected
-                      ? isNone
-                        ? 'bg-[#E7F3EC] border-[#2D6A4F] shadow-xs'
-                        : 'bg-[#FFF6ED] border-[#F4A261] shadow-xs'
-                      : 'bg-white border-[#E1E3E4] hover:border-[#BFC9C1]'
+                      ? 'border-[#2D6A4F] bg-[#E7F3EC]/70 shadow-xs'
+                      : 'border-[#EDEEEF] bg-white hover:border-[#CFD3D1]'
                   }`}
                 >
-                  <div className="pr-3">
+                  <div className="flex items-center justify-between w-full mb-1">
                     <span
-                      className={`text-sm font-bold block ${
-                        isSelected
-                          ? isNone
-                            ? 'text-[#0F5238]'
-                            : 'text-[#8E4E14]'
-                          : 'text-[#191C1D]'
+                      className={`text-sm font-black ${
+                        isSelected ? 'text-[#0F5238]' : 'text-[#191C1D]'
                       }`}
                     >
                       {opt.label}
                     </span>
-                    <span className="text-xs text-[#707973] block mt-0.5">
-                      {opt.description}
-                    </span>
+                    <div
+                      className={`w-5 h-5 rounded-full flex items-center justify-center border ${
+                        isSelected
+                          ? 'bg-[#2D6A4F] border-[#2D6A4F] text-white'
+                          : 'border-[#D0D4D2] bg-white'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
                   </div>
 
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border transition-all ${
-                      isSelected
-                        ? isNone
-                          ? 'bg-[#2D6A4F] border-[#2D6A4F] text-white'
-                          : 'bg-[#F4A261] border-[#F4A261] text-white'
-                        : 'border-[#BFC9C1] bg-[#F8F9FA]'
-                    }`}
-                  >
-                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#2D6A4F]/10 text-[#0F5238] self-start mb-1.5">
+                    {opt.badge}
+                  </span>
+
+                  <p className="text-[10px] text-[#525B54] leading-snug">
+                    {opt.description}
+                  </p>
                 </button>
               );
             })}
           </div>
         </section>
 
-        {/* Section 2: Nivel de Movilidad */}
-        <section className="space-y-3.5">
+        {/* 2. Nivel de Condición Física */}
+        <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#2D6A4F]" />
-              <span>2. Tu nivel de movilidad actual</span>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#2D6A4F]" />
+              <span>2. Nivel de Condición Física</span>
             </h2>
-            <span className="text-xs text-[#707973]">Selecciona uno</span>
+            <span className="text-[11px] text-[#707973]">Descansos y volumen</span>
           </div>
           <p className="text-xs text-[#707973]">
-            Determina la posición base y la exigencia postural de tu programa:
+            Calibra los tiempos de pausa y repeticiones prescritas por serie:
           </p>
 
           <div className="space-y-2.5">
-            {MOBILITY_LEVELS.map((level) => {
-              const isSelected = userProfile.mobilityLevel === level.id;
-              const IconComp = level.icon;
-
+            {FITNESS_LEVEL_OPTIONS.map((lvl) => {
+              const isSelected = userProfile.fitnessLevel === lvl.id;
               return (
                 <button
-                  key={level.id}
+                  key={lvl.id}
                   type="button"
-                  onClick={() => setMobilityLevel(level.id)}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 flex items-start gap-3.5 ${
+                  onClick={() => setFitnessLevel(lvl.id)}
+                  className={`w-full p-4 rounded-2xl border-2 text-left transition-all flex items-start justify-between gap-3 ${
                     isSelected
-                      ? 'bg-[#E7F3EC] border-[#2D6A4F] shadow-sm ring-1 ring-[#2D6A4F]'
-                      : 'bg-white border-[#E1E3E4] hover:border-[#BFC9C1]'
+                      ? 'border-[#2D6A4F] bg-[#E7F3EC]/70 shadow-xs'
+                      : 'border-[#EDEEEF] bg-white hover:border-[#CFD3D1]'
                   }`}
                 >
-                  <div
-                    className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                      isSelected
-                        ? 'bg-[#2D6A4F] text-white'
-                        : 'bg-[#F3F4F5] text-[#404943]'
-                    }`}
-                  >
-                    <IconComp className="w-5 h-5" />
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span
+                        className={`text-sm font-black ${
+                          isSelected ? 'text-[#0F5238]' : 'text-[#191C1D]'
+                        }`}
+                      >
+                        {lvl.label}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2D6A4F]/10 text-[#0F5238]">
+                        {lvl.badge}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-[#2D6A4F] block mb-1">
+                      {lvl.repsDesc}
+                    </span>
+                    <p className="text-xs text-[#525B54] leading-relaxed">
+                      {lvl.description}
+                    </p>
                   </div>
 
-                  <div className="flex-1 min-w-0 pr-2">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#2D6A4F]">
-                        {level.order} • {level.badge}
-                      </span>
-                      {isSelected && (
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#2D6A4F] text-white">
-                          Activo
-                        </span>
-                      )}
-                    </div>
-                    <strong className="text-sm font-bold text-[#191C1D] block">
-                      {level.title}
-                    </strong>
-                    <p className="text-xs text-[#404943] mt-1 leading-relaxed">
-                      {level.subtitle}
-                    </p>
+                  <div
+                    className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border mt-0.5 ${
+                      isSelected
+                        ? 'bg-[#2D6A4F] border-[#2D6A4F] text-white'
+                        : 'border-[#D0D4D2] bg-[#F8F9FA]'
+                    }`}
+                  >
+                    {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                   </div>
                 </button>
               );
@@ -313,19 +362,143 @@ export const OnboardingClinicalScreen: React.FC = () => {
           </div>
         </section>
 
-        {/* Section 3: Antropometría y Composición Corporal */}
-        <section className="space-y-3.5 bg-white p-4.5 rounded-2xl border border-[#E1E3E4] shadow-xs">
+        {/* 3. Condiciones de Salud Articular (Checkboxes) */}
+        <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
-              <Scale className="w-4 h-4 text-[#2D6A4F]" />
-              <span>3. Antropometría y Perfil Físico</span>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
+              <Shield className="w-4 h-4 text-[#2D6A4F]" />
+              <span>3. Puntos de Salud y Molestias Articulares</span>
             </h2>
-            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#E7F3EC] text-[#0F5238]">
-              Dinámico
+            <span className="text-[11px] text-[#707973]">Checkboxes</span>
+          </div>
+          <p className="text-xs text-[#707973]">
+            Marca las áreas donde sientes incomodidad para que el motor aplique las reglas de protección médica:
+          </p>
+
+          <div className="space-y-2">
+            {HEALTH_CONDITIONS_OPTIONS.map((cond) => {
+              const isSelected = (userProfile.healthConditions || []).includes(cond.id);
+              const isNone = cond.id === 'Ninguna';
+
+              return (
+                <button
+                  key={cond.id}
+                  type="button"
+                  onClick={() => toggleHealthCondition(cond.id)}
+                  className={`w-full text-left p-3.5 rounded-2xl border-2 transition-all flex items-start justify-between gap-3 ${
+                    isSelected
+                      ? isNone
+                        ? 'border-[#2D6A4F] bg-[#E7F3EC]'
+                        : 'border-[#F4A261] bg-[#FFF6ED]'
+                      : 'border-[#EDEEEF] bg-white hover:border-[#CFD3D1]'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="mt-0.5 text-[#2D6A4F]">
+                      {isSelected ? (
+                        <CheckSquare
+                          className={`w-5 h-5 ${
+                            isNone ? 'text-[#2D6A4F]' : 'text-[#F4A261]'
+                          }`}
+                        />
+                      ) : (
+                        <Square className="w-5 h-5 text-[#BCC1BE]" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <span
+                        className={`text-xs font-black block ${
+                          isSelected
+                            ? isNone
+                              ? 'text-[#0F5238]'
+                              : 'text-[#8E4E14]'
+                            : 'text-[#191C1D]'
+                        }`}
+                      >
+                        {cond.label}
+                      </span>
+                      <span className="text-[11px] text-[#525B54] block mt-0.5 leading-snug">
+                        <strong>Regla clínica:</strong> {cond.clinicalRule}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 4. Equipamiento Disponible */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
+              <Dumbbell className="w-4 h-4 text-[#2D6A4F]" />
+              <span>4. Equipamiento Disponible</span>
+            </h2>
+            <span className="text-[11px] text-[#707973]">Selecciona uno</span>
+          </div>
+          <p className="text-xs text-[#707973]">
+            Filtra los ejercicios a tus herramientas disponibles en casa:
+          </p>
+
+          <div className="space-y-2">
+            {EQUIPMENT_CHOICES.map((eq) => {
+              const isSelected = userProfile.equipmentAvailable === eq.id;
+              return (
+                <button
+                  key={eq.id}
+                  type="button"
+                  onClick={() => setEquipmentAvailable(eq.id)}
+                  className={`w-full p-3.5 rounded-2xl border-2 text-left transition-all flex items-center justify-between gap-3 ${
+                    isSelected
+                      ? 'border-[#2D6A4F] bg-[#E7F3EC]/70 shadow-xs'
+                      : 'border-[#EDEEEF] bg-white hover:border-[#CFD3D1]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="text-2xl shrink-0">{eq.icon}</span>
+                    <div>
+                      <span
+                        className={`text-xs font-black block ${
+                          isSelected ? 'text-[#0F5238]' : 'text-[#191C1D]'
+                        }`}
+                      >
+                        {eq.label}
+                      </span>
+                      <span className="text-[11px] text-[#525B54] block mt-0.5">
+                        {eq.description}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${
+                      isSelected
+                        ? 'bg-[#2D6A4F] border-[#2D6A4F] text-white'
+                        : 'border-[#D0D4D2] bg-[#F8F9FA]'
+                    }`}
+                  >
+                    {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 5. Antropometría Opcional */}
+        <section className="space-y-3 bg-white p-4.5 rounded-2xl border border-[#E1E3E4] shadow-xs">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
+              <Scale className="w-4 h-4 text-[#2D6A4F]" />
+              <span>5. Antropometría Opcional</span>
+            </h2>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E7F3EC] text-[#0F5238]">
+              No vinculante
             </span>
           </div>
           <p className="text-xs text-[#707973] leading-relaxed">
-            Permite personalizar tu gasto calórico estimado y medir tus progresos de salud a lo largo del año.
+            Permite estimar el gasto metabólico y registrar tu evolución corporal de forma respetuosa.
           </p>
 
           <div className="grid grid-cols-2 gap-3 pt-1">
@@ -375,23 +548,16 @@ export const OnboardingClinicalScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Real-time Non-stigmatizing BMI display */}
           {bmiAssessment && (
-            <div className="mt-3 p-3.5 rounded-xl bg-[#E7F3EC] border border-[#B1F0CE] space-y-2 animate-in fade-in duration-300">
+            <div className="mt-3 p-3.5 rounded-xl bg-[#E7F3EC] border border-[#B1F0CE] space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-[#0F5238]">IMC Calculado:</span>
-                  <span className="text-sm font-extrabold text-[#0F5238]">
-                    {bmiAssessment.bmi} kg/m²
-                  </span>
-                </div>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#2D6A4F] text-white">
+                <span className="text-xs font-bold text-[#0F5238]">
+                  IMC: {bmiAssessment.bmi} kg/m²
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#2D6A4F] text-white">
                   {bmiAssessment.label}
                 </span>
               </div>
-              <p className="text-xs font-bold text-[#0F5238] italic">
-                “El IMC es solo una referencia inicial, la composición corporal y la fuerza son lo verdaderamente importante.”
-              </p>
               <p className="text-[11px] text-[#404943] leading-relaxed">
                 {bmiAssessment.advice}
               </p>
@@ -399,60 +565,11 @@ export const OnboardingClinicalScreen: React.FC = () => {
           )}
         </section>
 
-        {/* Section 4: Material en Casa */}
-        <section className="space-y-3.5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#2D6A4F]" />
-              <span>4. Material disponible en casa</span>
-            </h2>
-            <span className="text-xs text-[#707973]">Multiselección</span>
-          </div>
-          <p className="text-xs text-[#707973]">
-            No necesitas comprar nada. Ajustamos todo a los elementos que tengas a mano:
-          </p>
-
-          <div className="grid grid-cols-2 gap-2.5">
-            {EQUIPMENT_OPTIONS.map((item) => {
-              const isSelected = userProfile.availableEquipment.includes(item.id);
-
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => toggleEquipment(item.id)}
-                  className={`p-3 rounded-2xl border text-left transition-all duration-150 flex items-center gap-2.5 ${
-                    isSelected
-                      ? 'bg-[#E7F3EC] border-[#2D6A4F] shadow-2xs'
-                      : 'bg-white border-[#E1E3E4] hover:border-[#BFC9C1]'
-                  }`}
-                >
-                  <span className="text-lg shrink-0">{item.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className={`text-xs font-bold block truncate ${
-                        isSelected ? 'text-[#0F5238]' : 'text-[#191C1D]'
-                      }`}
-                    >
-                      {item.label}
-                    </span>
-                  </div>
-                  {isSelected && (
-                    <div className="w-4 h-4 rounded-full bg-[#2D6A4F] text-white flex items-center justify-center shrink-0">
-                      <Check className="w-2.5 h-2.5 stroke-[3]" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Informative Safety Guarantee Card */}
-        <div className="p-4 rounded-2xl bg-[#FFF6ED] border border-[#FFDCC4] flex items-start gap-3">
-          <Info className="w-5 h-5 text-[#8E4E14] shrink-0 mt-0.5" />
-          <p className="text-xs text-[#8E4E14] leading-relaxed">
-            <strong>Garantía de Seguridad AdaptFit:</strong> Cualquier ejercicio que te genere molestia podrá ser reemplazado al instante mediante nuestro botón de pánico durante la sesión.
+        {/* Safety Guarantee */}
+        <div className="p-4 rounded-2xl bg-[#E7F3EC] border border-[#B1F0CE] flex items-start gap-3">
+          <ShieldCheck className="w-5 h-5 text-[#2D6A4F] shrink-0 mt-0.5" />
+          <p className="text-xs text-[#0F5238] leading-relaxed">
+            <strong>Protección Activa en Vivo:</strong> En cualquier momento de tu entrenamiento podrás pulsar el botón de pánico para sustituir un ejercicio por una alternativa suave sin impacto o descartarlo de inmediato.
           </p>
         </div>
       </main>
@@ -469,10 +586,11 @@ export const OnboardingClinicalScreen: React.FC = () => {
               : 'bg-[#EDEEEF] text-[#707973] cursor-not-allowed'
           }`}
         >
-          <span>Continuar a mi Plan Anual</span>
+          <span>Guardar Perfil y Diseñar mi Plan</span>
           <ArrowRight className="w-5 h-5" />
         </button>
       </footer>
     </div>
   );
 };
+

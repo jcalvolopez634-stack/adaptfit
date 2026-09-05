@@ -1040,6 +1040,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
         {/* Panic Button: Immediate Replacement if Joint Discomfort Appears */}
         <button
           type="button"
+          id="panic-button-active-workout"
           onClick={openPanicReplacementModal}
           className="w-full p-4 rounded-2xl bg-[#FFF6ED] border border-[#FFDCC4] text-[#8E4E14] hover:bg-[#FFEDDC] active:scale-[0.99] transition-all flex items-center justify-between shadow-2xs group"
         >
@@ -1052,7 +1053,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 ¿Sientes pinchazo o molestia articular?
               </strong>
               <span className="text-[11px] text-[#8E4E14]/80 block">
-                Botón de Pánico: sustituir por una variante segura sin perder progreso
+                Parada de Emergencia: sustituir por variante suave, descartar o respirar 60s
               </span>
             </div>
           </div>

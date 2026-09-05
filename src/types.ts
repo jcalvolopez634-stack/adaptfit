@@ -77,10 +77,30 @@ export interface AnthropometricRecord {
   notes?: string;
 }
 
+export type BiologicalSex = 'Mujer' | 'Hombre';
+
+export type FitnessLevel = 'Iniciación / Recuperación' | 'Moderado' | 'Activo habitual';
+
+export type HealthCondition =
+  | 'Molestia lumbar'
+  | 'Molestia en rodillas'
+  | 'Molestia en hombros/cuello'
+  | 'Problemas de equilibrio'
+  | 'Ninguna';
+
+export type EquipmentAvailableChoice =
+  | 'Solo peso corporal y silla'
+  | 'Bandas elásticas'
+  | 'Mancuernas / Pesos';
+
 export interface UserProfile {
   name: string;
   avatarType: AvatarType;
   avatarValue: string; // URL en Base64 de foto subida o identificador de avatar predeterminado
+  biologicalSex?: BiologicalSex; // "Mujer" | "Hombre" (ajusta consideraciones biomecánicas y estabilidad pélvica/rodilla)
+  fitnessLevel?: FitnessLevel; // "Iniciación / Recuperación" | "Moderado" | "Activo habitual"
+  healthConditions?: HealthCondition[]; // "Molestia lumbar" | "Molestia en rodillas" | "Molestia en hombros/cuello" | "Problemas de equilibrio" | "Ninguna"
+  equipmentAvailable?: EquipmentAvailableChoice; // "Solo peso corporal y silla" | "Bandas elásticas" | "Mancuernas / Pesos"
   heightCm?: number; // Altura en cm
   weightKg?: number; // Peso inicial o actual en kg
   discomfortZones: JointDiscomfortZone[];
@@ -288,6 +308,28 @@ export interface ActiveWorkoutState {
   currentSetRepsInput?: number;
   currentSetWeightKgInput?: number;
   recordedSets?: Record<string, ExerciseSetRecord[]>;
+  // Protocolo de seguridad articular y botón de pánico
+  safetyIncidents?: JointSafetyIncident[];
+  isBreathingPauseActive?: boolean;
+}
+
+export type JointSafetyActionType =
+  | 'sustituido_por_alternativa'
+  | 'descartado_seguridad'
+  | 'pausa_respiratoria';
+
+export interface JointSafetyIncident {
+  id: string;
+  timestamp: string; // ISO string
+  exerciseId: string;
+  exerciseTitle: string;
+  action: JointSafetyActionType;
+  replacementExerciseId?: string;
+  replacementExerciseTitle?: string;
+  movementPattern?: MovementPattern | string;
+  targetMuscleGroup?: string;
+  reason: string;
+  clinicalNote: string;
 }
 
 export interface ExerciseSetRecord {
@@ -344,6 +386,7 @@ export interface CompletedWorkout {
   unexpectedDiscomfort?: boolean;
   discomfortNotes?: string;
   exercisesCompleted?: CompletedWorkoutExerciseRecord[];
+  safetyIncidents?: JointSafetyIncident[];
 }
 
 // ==========================================
