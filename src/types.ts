@@ -93,6 +93,8 @@ export type EquipmentAvailableChoice =
   | 'Bandas elásticas'
   | 'Mancuernas / Pesos';
 
+export type DumbbellType = 'fijas' | 'ajustables_discos' | 'peso_corporal_solamente';
+
 export interface UserProfile {
   name: string;
   avatarType: AvatarType;
@@ -101,6 +103,8 @@ export interface UserProfile {
   fitnessLevel?: FitnessLevel; // "Iniciación / Recuperación" | "Moderado" | "Activo habitual"
   healthConditions?: HealthCondition[]; // "Molestia lumbar" | "Molestia en rodillas" | "Molestia en hombros/cuello" | "Problemas de equilibrio" | "Ninguna"
   equipmentAvailable?: EquipmentAvailableChoice; // "Solo peso corporal y silla" | "Bandas elásticas" | "Mancuernas / Pesos"
+  dumbbellType?: DumbbellType; // 'fijas' | 'ajustables_discos' | 'peso_corporal_solamente'
+  availableWeightsKg?: number[]; // ej. [1, 1.5, 2, 3, 4, 5]
   heightCm?: number; // Altura en cm
   weightKg?: number; // Peso inicial o actual en kg
   discomfortZones: JointDiscomfortZone[];

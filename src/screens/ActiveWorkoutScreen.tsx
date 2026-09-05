@@ -6,7 +6,7 @@
  * 4. Audio-guía por voz, avisos sonoros (Web Audio API), Botón de Pánico y Ficha Pedagógica.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { PanicSwapModal } from './PanicSwapModal';
 import {
@@ -30,6 +30,7 @@ import {
   Heart,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Flame,
   Dumbbell,
   TrendingUp,
@@ -93,9 +94,12 @@ export const ActiveWorkoutScreen: React.FC = () => {
     setCurrentSetReps,
     setCurrentSetWeightKg,
     getPreviousExercisePerformance,
+    userProfile,
     navigateTo,
     goBack,
   } = useApp();
+
+  const [isSensoryAccordionOpen, setIsSensoryAccordionOpen] = useState(false);
 
   const prevSecondsRef = useRef(activeWorkout.secondsRemaining);
   const prevRestRef = useRef(activeWorkout.restSecondsRemaining);
@@ -120,13 +124,33 @@ export const ActiveWorkoutScreen: React.FC = () => {
     ? getPreviousExercisePerformance(currentExercise.id)
     : null;
 
+  const availableWeights =
+    userProfile.availableWeightsKg && userProfile.availableWeightsKg.length > 0
+      ? [...userProfile.availableWeightsKg].sort((a, b) => a - b)
+      : [1, 2, 3, 4, 5];
+
   const handleRepsChange = (delta: number) => {
     setCurrentSetReps(Math.max(1, currentReps + delta));
   };
 
   const handleWeightChange = (delta: number) => {
-    const next = Math.max(0, Number((currentWeightKg + delta).toFixed(1)));
-    setCurrentSetWeightKg(next);
+    // Si el usuario tiene una lista de pesos disponibles, saltar al peso inmediatamente superior o inferior
+    if (delta > 0) {
+      const higherWeights = availableWeights.filter((w) => w > currentWeightKg);
+      if (higherWeights.length > 0) {
+        setCurrentSetWeightKg(higherWeights[0]);
+      } else {
+        // Incremento normal de 0.5kg
+        setCurrentSetWeightKg(Number((currentWeightKg + 0.5).toFixed(1)));
+      }
+    } else {
+      const lowerWeights = availableWeights.filter((w) => w < currentWeightKg);
+      if (lowerWeights.length > 0) {
+        setCurrentSetWeightKg(lowerWeights[lowerWeights.length - 1]);
+      } else {
+        setCurrentSetWeightKg(Math.max(0, Number((currentWeightKg - 0.5).toFixed(1))));
+      }
+    }
   };
 
   // Sound tone effect when active seconds or rest reach 3, 2, 1 and 0
@@ -377,10 +401,10 @@ export const ActiveWorkoutScreen: React.FC = () => {
         {/* CONDITIONAL RENDER: REST PHASE (Descanso Interactivo)     */}
         {/* ========================================================= */}
         {phase === 'REST' ? (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {/* Banner de Descanso */}
             <div className="p-4 rounded-3xl bg-gradient-to-br from-[#E7F3EC] to-[#D4EDE0] border border-[#B1F0CE] text-center space-y-2 shadow-xs">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 text-[#0F5238] text-xs font-black shadow-2xs">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 text-[#0F5238] text-xs font-black shadow-2xs">
                 <Clock className="w-3.5 h-3.5 text-[#2D6A4F]" />
                 <span>Descanso Activo • Entre Serie {currentSet} y {currentSet + 1}</span>
               </div>
@@ -390,13 +414,13 @@ export const ActiveWorkoutScreen: React.FC = () => {
               </h2>
 
               <p className="text-xs text-[#2D6A4F] max-w-xs mx-auto leading-relaxed">
-                Inhala hondo por la nariz y exhala suavemente. Permite que tus articulaciones y fibras musculares recuperen energía.
+                Inhala hondo por la nariz y exhala suavemente. Permite que tus articulaciones y fibras musculares recuperen energía antes de la siguiente serie.
               </p>
             </div>
 
-            {/* Circular Rest Countdown Timer */}
-            <div className="p-6 rounded-3xl bg-white border border-[#E1E3E4] flex flex-col items-center justify-center space-y-4 shadow-xs">
-              <div className="relative w-40 h-40 flex items-center justify-center">
+            {/* Circular Rest Countdown Timer - Gran Legibilidad a Distancia */}
+            <div className="p-6 rounded-3xl bg-white border border-[#E1E3E4] flex flex-col items-center justify-center space-y-5 shadow-xs">
+              <div className="relative w-48 h-48 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 140 140">
                   <circle
                     cx="70"
@@ -420,40 +444,43 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 </svg>
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-4xl font-black text-[#191C1D] tracking-tight font-mono">
+                  <span className="text-5xl font-black text-[#0F5238] tracking-tight font-mono">
                     {restRemaining}s
                   </span>
-                  <span className="text-[11px] uppercase tracking-wider font-extrabold text-[#2D6A4F] mt-0.5">
-                    Descansando
+                  <span className="text-xs uppercase tracking-wider font-extrabold text-[#2D6A4F] mt-1">
+                    Recuperando
                   </span>
                 </div>
               </div>
 
-              {/* Selector de Duración de Descanso: 45s o 60s */}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-xs font-bold text-[#707973]">Duración:</span>
-                <button
-                  type="button"
-                  onClick={() => setConfiguredRestDuration(45)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    configuredRest === 45
-                      ? 'bg-[#2D6A4F] text-white shadow-2xs'
-                      : 'bg-[#F3F4F5] text-[#525B54] hover:bg-[#EDEEEF]'
-                  }`}
-                >
-                  45 segundos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfiguredRestDuration(60)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    configuredRest === 60
-                      ? 'bg-[#2D6A4F] text-white shadow-2xs'
-                      : 'bg-[#F3F4F5] text-[#525B54] hover:bg-[#EDEEEF]'
-                  }`}
-                >
-                  60 segundos
-                </button>
+              {/* Guía de Respiración Rítmica */}
+              <div className="w-full max-w-xs p-3 rounded-2xl bg-[#E7F3EC]/70 border border-[#B1F0CE] text-center space-y-1">
+                <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#0F5238]">
+                  <Heart className="w-3.5 h-3.5 text-[#2D6A4F] animate-pulse" />
+                  <span>Respiración Consciente</span>
+                </div>
+                <p className="text-[11px] text-[#0F5238] leading-tight">
+                  Inhala en 4s expandiendo el abdomen... exhala en 4s relajando hombros.
+                </p>
+              </div>
+
+              {/* Selector de Duración de Descanso Rápido */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <span className="text-xs font-bold text-[#707973] mr-1">Duración:</span>
+                {[30, 45, 60, 90].map((dur) => (
+                  <button
+                    key={dur}
+                    type="button"
+                    onClick={() => setConfiguredRestDuration(dur)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      configuredRest === dur
+                        ? 'bg-[#2D6A4F] text-white shadow-2xs'
+                        : 'bg-[#F3F4F5] text-[#525B54] hover:bg-[#EDEEEF]'
+                    }`}
+                  >
+                    {dur}s
+                  </button>
+                ))}
               </div>
 
               {/* Botón para saltar descanso inmediatamente */}
@@ -468,10 +495,15 @@ export const ActiveWorkoutScreen: React.FC = () => {
             </div>
 
             {/* Tarjeta de Próxima Serie */}
-            <div className="p-4 rounded-2xl bg-white border border-[#E1E3E4] space-y-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-[#707973]">
-                <Activity className="w-4 h-4 text-[#2D6A4F]" />
-                <span>Próxima: Serie {currentSet + 1} de {totalSets}</span>
+            <div className="p-4 rounded-2xl bg-white border border-[#E1E3E4] space-y-2 shadow-2xs">
+              <div className="flex items-center justify-between text-xs font-bold text-[#707973]">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#2D6A4F]" />
+                  <span>Próxima: Serie {currentSet + 1} de {totalSets}</span>
+                </div>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#E7F3EC] text-[#0F5238] font-extrabold">
+                  {currentReps} reps • {currentWeightKg > 0 ? `${currentWeightKg} kg` : 'Sin peso'}
+                </span>
               </div>
               <p className="text-xs text-[#191C1D] font-medium leading-relaxed">
                 Ejercicio: <strong>{currentExercise?.name || currentExercise?.title}</strong>
@@ -499,6 +531,88 @@ export const ActiveWorkoutScreen: React.FC = () => {
                   <p className="text-[#8E4E14]/90 leading-relaxed">
                     El cronómetro está <strong>DETENIDO en 0</strong>. Revisa la postura del Paso 0 y colócate con calma. Cuando estés en posición firme, pulsa el botón inferior para arrancar la <strong>Serie {currentSet}</strong>.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* CRONÓMETRO PROTAGONISTA DURANTE SERIE ACTIVA (SET_ACTIVE) - NÚMEROS GRANDES Y LEGIBLES A DISTANCIA */}
+            {phase === 'SET_ACTIVE' && (
+              <div className="p-6 rounded-3xl bg-white border border-[#E1E3E4] flex flex-col items-center justify-center space-y-4 shadow-sm">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#E7F3EC] text-[#0F5238] text-xs font-black">
+                  <span className="w-2 h-2 rounded-full bg-[#2D6A4F] animate-ping" />
+                  <span>Serie {currentSet} de {totalSets} • {activeWorkout.isPlaying ? 'En Ejecución Activa' : 'Pausado'}</span>
+                </div>
+
+                {/* Circular SVG Timer de Gran Formato */}
+                <div className="relative w-48 h-48 sm:w-52 sm:h-52 flex items-center justify-center">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 140 140">
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r={strokeRadius}
+                      className="stroke-[#EDEEEF]"
+                      strokeWidth="8"
+                      fill="transparent"
+                    />
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r={strokeRadius}
+                      className="stroke-[#2D6A4F] transition-all duration-1000 ease-linear"
+                      strokeWidth="8"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      fill="transparent"
+                    />
+                  </svg>
+
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                    <span className="text-5xl sm:text-6xl font-black text-[#191C1D] tracking-tight font-mono">
+                      {formatTime(remaining)}
+                    </span>
+                    <span className="text-[11px] uppercase tracking-wider font-extrabold text-[#707973] mt-1">
+                      {activeWorkout.isPlaying ? 'Segundos restantes' : 'En pausa'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Controles Ergonómicos de Serie */}
+                <div className="flex items-center justify-center gap-4 w-full max-w-xs">
+                  <button
+                    type="button"
+                    onClick={resetExerciseTimer}
+                    className="w-12 h-12 rounded-2xl bg-[#F3F4F5] hover:bg-[#EDEEEF] active:scale-95 text-[#404943] flex items-center justify-center transition-all border border-[#E1E3E4]"
+                    title="Reiniciar cronómetro"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={togglePlayPauseWorkout}
+                    className={`w-16 h-16 rounded-3xl text-white flex items-center justify-center shadow-md active:scale-95 transition-all ${
+                      activeWorkout.isPlaying
+                        ? 'bg-[#F4A261] hover:bg-[#E76F51]'
+                        : 'bg-[#2D6A4F] hover:bg-[#0F5238]'
+                    }`}
+                    title={activeWorkout.isPlaying ? 'Pausar' : 'Reanudar'}
+                  >
+                    {activeWorkout.isPlaying ? (
+                      <Pause className="w-7 h-7 fill-white" />
+                    ) : (
+                      <Play className="w-7 h-7 fill-white ml-0.5" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={completeCurrentSet}
+                    className="w-12 h-12 rounded-2xl bg-[#E7F3EC] hover:bg-[#B1F0CE] text-[#0F5238] active:scale-95 flex items-center justify-center font-bold transition-all border border-[#B1F0CE]"
+                    title="Completar serie ahora"
+                  >
+                    <CheckCircle2 className="w-6 h-6 text-[#2D6A4F]" />
+                  </button>
                 </div>
               </div>
             )}
@@ -612,12 +726,12 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 </p>
               </div>
 
-              {/* DESGLOSE PEDAGÓGICO EN TEXTO */}
+              {/* DESGLOSE PEDAGÓGICO: POSTURA CORRECTA Y PASOS */}
               <div className="space-y-3 pt-2 border-t border-[#EDEEEF]">
-                {/* Paso 0: Colocación Inicial */}
-                <div className={`p-3 rounded-2xl border space-y-1 transition-all ${
+                {/* Paso 0: Colocación y Postura Correcta */}
+                <div className={`p-3.5 rounded-2xl border space-y-1 transition-all ${
                   phase === 'PREPARATION'
-                    ? 'bg-[#E7F3EC]/80 border-[#2D6A4F] ring-2 ring-[#2D6A4F]/20'
+                    ? 'bg-[#E7F3EC]/90 border-[#2D6A4F] ring-2 ring-[#2D6A4F]/20 shadow-xs'
                     : 'bg-[#F8F9FA] border-[#E1E3E4]'
                 }`}>
                   <div className="flex items-center gap-1.5 text-[#2D6A4F]">
@@ -625,7 +739,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
                       0
                     </span>
                     <h4 className="text-xs font-black uppercase tracking-wide text-[#191C1D]">
-                      Paso 0: Colocación inicial
+                      Paso 0: Colocación y postura correcta
                     </h4>
                     {phase === 'PREPARATION' && (
                       <span className="ml-auto text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#2D6A4F] text-white">
@@ -641,7 +755,7 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 </div>
 
                 {/* Pasos 1-2-3 de Ejecución */}
-                <div className="p-3 rounded-2xl bg-white border border-[#E1E3E4] space-y-2.5">
+                <div className="p-3.5 rounded-2xl bg-white border border-[#E1E3E4] space-y-2.5">
                   <h4 className="text-[11px] font-black uppercase tracking-wider text-[#707973] flex items-center gap-1.5">
                     <Layers className="w-3.5 h-3.5 text-[#2D6A4F]" />
                     <span>Pasos 1-2-3 de Ejecución</span>
@@ -695,123 +809,84 @@ export const ActiveWorkoutScreen: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Dónde Notarlo */}
-                <div className="p-3 rounded-2xl bg-[#E7F3EC]/70 border border-[#B1F0CE] space-y-1">
-                  <div className="flex items-center gap-1.5 text-[#0F5238]">
-                    <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
-                    <h4 className="text-xs font-black uppercase tracking-wide text-[#0F5238]">
-                      Dónde notarlo
-                    </h4>
-                  </div>
-                  <p className="text-xs text-[#0F5238] font-medium leading-relaxed pl-5">
-                    {currentExercise?.whereToFeel ||
-                      currentExercise?.sensoryMapping ||
-                      `Notarás el trabajo activo en ${currentExercise?.targetMuscleGroup || 'el músculo objetivo'}. Ninguna molestia articular.`}
-                  </p>
-                </div>
+                {/* ACORDEÓN ACCESIBLE: MAPA SENSORIAL Y ERRORES A EVITAR */}
+                <div className="border border-[#E1E3E4] rounded-2xl overflow-hidden bg-[#F8F9FA] transition-all">
+                  <button
+                    type="button"
+                    onClick={() => setIsSensoryAccordionOpen(!isSensoryAccordionOpen)}
+                    aria-expanded={isSensoryAccordionOpen}
+                    className="w-full p-3.5 flex items-center justify-between text-left hover:bg-[#EDEEEF]/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center shrink-0">
+                        <Activity className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-[#191C1D] block">
+                          Mapa Sensorial y Cuidados de Postura
+                        </span>
+                        <span className="text-[11px] text-[#707973]">
+                          {isSensoryAccordionOpen
+                            ? 'Toca para contraer'
+                            : 'Dónde sentir el trabajo y errores a evitar'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-[#2D6A4F] text-xs font-extrabold shrink-0">
+                      <span>{isSensoryAccordionOpen ? 'Ocultar' : 'Ver'}</span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          isSensoryAccordionOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </div>
+                  </button>
 
-                {/* Errores Comunes a Evitar */}
-                <div className="p-3 rounded-2xl bg-[#FFF6ED] border border-[#FFDCC4] space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-[#B45309]">
-                    <AlertTriangle className="w-4 h-4 text-[#E76F51] shrink-0" />
-                    <h4 className="text-xs font-black uppercase tracking-wide text-[#8E4E14]">
-                      Errores comunes a evitar
-                    </h4>
-                  </div>
-                  <ul className="text-xs text-[#8E4E14] space-y-1 pl-5 list-disc list-outside">
-                    {currentExercise?.commonMistakes && currentExercise.commonMistakes.length > 0 ? (
-                      currentExercise.commonMistakes.map((mistake, i) => (
-                        <li key={i} className="leading-relaxed">
-                          {mistake}
-                        </li>
-                      ))
-                    ) : (
-                      <li className="leading-relaxed">
-                        {currentExercise?.avoidError?.description ||
-                          'Evitar arquear la espalda lumbar o empujar con inercias bruscas.'}
-                      </li>
-                    )}
-                  </ul>
+                  {isSensoryAccordionOpen && (
+                    <div className="p-3.5 pt-1 space-y-3 border-t border-[#EDEEEF] bg-white">
+                      {/* Dónde Notarlo */}
+                      <div className="p-3 rounded-xl bg-[#E7F3EC]/80 border border-[#B1F0CE] space-y-1">
+                        <div className="flex items-center gap-1.5 text-[#0F5238]">
+                          <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
+                          <h4 className="text-xs font-black uppercase tracking-wide text-[#0F5238]">
+                            Dónde notarlo
+                          </h4>
+                        </div>
+                        <p className="text-xs text-[#0F5238] font-medium leading-relaxed pl-5">
+                          {currentExercise?.whereToFeel ||
+                            currentExercise?.sensoryMapping ||
+                            `Notarás el trabajo activo en ${currentExercise?.targetMuscleGroup || 'el músculo objetivo'}. Ninguna molestia articular.`}
+                        </p>
+                      </div>
+
+                      {/* Errores Comunes a Evitar */}
+                      <div className="p-3 rounded-xl bg-[#FFF6ED] border border-[#FFDCC4] space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[#B45309]">
+                          <AlertTriangle className="w-4 h-4 text-[#E76F51] shrink-0" />
+                          <h4 className="text-xs font-black uppercase tracking-wide text-[#8E4E14]">
+                            Errores comunes a evitar
+                          </h4>
+                        </div>
+                        <ul className="text-xs text-[#8E4E14] space-y-1 pl-5 list-disc list-outside">
+                          {currentExercise?.commonMistakes && currentExercise.commonMistakes.length > 0 ? (
+                            currentExercise.commonMistakes.map((mistake, i) => (
+                              <li key={i} className="leading-relaxed">
+                                {mistake}
+                              </li>
+                            ))
+                          ) : (
+                            <li className="leading-relaxed">
+                              {currentExercise?.avoidError?.description ||
+                                'Evitar arquear la espalda lumbar o empujar con inercias bruscas.'}
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Cronómetro y Controles Circulares durante SET_ACTIVE */}
-            {phase === 'SET_ACTIVE' && (
-              <div className="p-5 rounded-3xl bg-white border border-[#E1E3E4] flex flex-col items-center justify-center space-y-4 shadow-xs">
-                {/* Circular SVG Timer */}
-                <div className="relative w-36 h-36 flex items-center justify-center">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 140 140">
-                    <circle
-                      cx="70"
-                      cy="70"
-                      r={strokeRadius}
-                      className="stroke-[#EDEEEF]"
-                      strokeWidth="9"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="70"
-                      cy="70"
-                      r={strokeRadius}
-                      className="stroke-[#2D6A4F] transition-all duration-1000 ease-linear"
-                      strokeWidth="9"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      fill="transparent"
-                    />
-                  </svg>
-
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                    <span className="text-3xl font-black text-[#191C1D] tracking-tight font-mono">
-                      {formatTime(remaining)}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wider font-bold text-[#707973]">
-                      {activeWorkout.isPlaying ? `Serie ${currentSet} en marcha` : 'Pausado'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Controls Bar: Reset, Play/Pause, Finish Set */}
-                <div className="flex items-center justify-center gap-3 w-full max-w-[280px]">
-                  <button
-                    type="button"
-                    onClick={resetExerciseTimer}
-                    className="w-12 h-12 rounded-2xl bg-[#F3F4F5] hover:bg-[#EDEEEF] active:scale-95 text-[#404943] flex items-center justify-center transition-all"
-                    title="Reiniciar cronómetro de serie"
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={togglePlayPauseWorkout}
-                    className={`w-16 h-16 rounded-3xl text-white flex items-center justify-center shadow-md active:scale-95 transition-all ${
-                      activeWorkout.isPlaying
-                        ? 'bg-[#F4A261] hover:bg-[#E76F51]'
-                        : 'bg-[#2D6A4F] hover:bg-[#0F5238]'
-                    }`}
-                    title={activeWorkout.isPlaying ? 'Pausar' : 'Reanudar'}
-                  >
-                    {activeWorkout.isPlaying ? (
-                      <Pause className="w-6 h-6 fill-white" />
-                    ) : (
-                      <Play className="w-6 h-6 fill-white ml-0.5" />
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={completeCurrentSet}
-                    className="w-12 h-12 rounded-2xl bg-[#E7F3EC] hover:bg-[#B1F0CE] text-[#0F5238] active:scale-95 flex items-center justify-center font-bold text-xs transition-all"
-                    title="Completar serie ahora"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
 
@@ -964,9 +1039,9 @@ export const ActiveWorkoutScreen: React.FC = () => {
                 </button>
               </div>
 
-              {/* Chips Rápidos de Peso */}
+              {/* Chips Rápidos de Peso adaptados al inventario real */}
               <div className="flex items-center justify-between gap-1 pt-1">
-                {[0, 2, 4, 6, 8, 10].map((kgOption) => (
+                {[0, ...Array.from(new Set(availableWeights)).slice(0, 5)].map((kgOption) => (
                   <button
                     key={kgOption}
                     type="button"
@@ -1037,28 +1112,28 @@ export const ActiveWorkoutScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Panic Button: Immediate Replacement if Joint Discomfort Appears */}
+        {/* Botón de Parada Amigable y Adaptación Inmediata */}
         <button
           type="button"
           id="panic-button-active-workout"
           onClick={openPanicReplacementModal}
-          className="w-full p-4 rounded-2xl bg-[#FFF6ED] border border-[#FFDCC4] text-[#8E4E14] hover:bg-[#FFEDDC] active:scale-[0.99] transition-all flex items-center justify-between shadow-2xs group"
+          className="w-full p-4 rounded-2xl bg-[#EAF5EF] border border-[#2D6A4F]/25 text-[#0F5238] hover:bg-[#DEF0E5] active:scale-[0.99] transition-all flex items-center justify-between shadow-2xs group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#F4A261] text-white flex items-center justify-center shrink-0">
-              <ShieldAlert className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-[#2D6A4F] text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <ShieldCheck className="w-5 h-5 text-[#B1F0CE]" />
             </div>
             <div className="text-left">
-              <strong className="text-xs font-extrabold block">
-                ¿Sientes pinchazo o molestia articular?
+              <strong className="text-xs sm:text-sm font-black block text-[#0F5238]">
+                ¿Molestia articular? Adaptar
               </strong>
-              <span className="text-[11px] text-[#8E4E14]/80 block">
-                Parada de Emergencia: sustituir por variante suave, descartar o respirar 60s
+              <span className="text-[11px] text-[#2D6A4F] block leading-tight">
+                Toca para cambiar por variante suave, apoyo en pared o respirar sin penalización.
               </span>
             </div>
           </div>
 
-          <ArrowRight className="w-4 h-4 text-[#8E4E14] group-hover:translate-x-0.5 transition-transform shrink-0" />
+          <ArrowRight className="w-4 h-4 text-[#2D6A4F] group-hover:translate-x-0.5 transition-transform shrink-0 ml-2" />
         </button>
       </main>
 

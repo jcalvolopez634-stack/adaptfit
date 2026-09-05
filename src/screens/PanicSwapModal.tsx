@@ -46,6 +46,7 @@ type ModalView = 'OPTIONS' | 'ALTERNATIVES' | 'BREATHING';
 
 export const PanicSwapModal: React.FC<PanicSwapModalProps> = ({ onClose }) => {
   const {
+    userProfile,
     activeWorkout,
     replaceCurrentExerciseWithAlternative,
     discardCurrentExerciseForSafety,
@@ -69,11 +70,15 @@ export const PanicSwapModal: React.FC<PanicSwapModalProps> = ({ onClose }) => {
 
   const currentExercise = activeWorkout.currentExercise;
 
-  // Find dynamic safe alternatives matching movementPattern or muscleGroup with lower/zero impact
+  // Find dynamic safe alternatives matching movementPattern or muscleGroup with lower/zero impact, prioritizing available equipment
   const safeAlternatives = useMemo(() => {
     if (!currentExercise) return [];
-    return findSafeAlternativesForExercise(currentExercise, 4);
-  }, [currentExercise]);
+    return findSafeAlternativesForExercise(
+      currentExercise,
+      4,
+      userProfile.equipmentAvailable || userProfile.availableEquipment
+    );
+  }, [currentExercise, userProfile.equipmentAvailable, userProfile.availableEquipment]);
 
   // Gentle audio chime for breathing transitions
   const playBreathChime = (frequency = 440) => {

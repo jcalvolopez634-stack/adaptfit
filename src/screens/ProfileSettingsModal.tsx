@@ -9,6 +9,7 @@ import {
   FitnessLevel,
   HealthCondition,
   EquipmentAvailableChoice,
+  DumbbellType,
 } from '../types';
 import { calculateBMI } from '../utils/anthropometry';
 import {
@@ -105,6 +106,25 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   const [equipmentAvailable, setEquipmentAvailable] = useState<EquipmentAvailableChoice>(
     userProfile.equipmentAvailable || 'Solo peso corporal y silla'
   );
+  const [dumbbellType, setDumbbellType] = useState<DumbbellType>(
+    userProfile.dumbbellType || 'fijas'
+  );
+  const [availableWeightsKg, setAvailableWeightsKg] = useState<number[]>(
+    userProfile.availableWeightsKg && userProfile.availableWeightsKg.length > 0
+      ? userProfile.availableWeightsKg
+      : [1, 2, 3, 4, 5]
+  );
+  const [customWeightInput, setCustomWeightInput] = useState<string>('');
+
+  const handleAddWeight = (weight: number) => {
+    if (weight > 0 && !availableWeightsKg.includes(weight)) {
+      setAvailableWeightsKg([...availableWeightsKg, weight].sort((a, b) => a - b));
+    }
+  };
+
+  const handleRemoveWeight = (weight: number) => {
+    setAvailableWeightsKg(availableWeightsKg.filter((w) => w !== weight));
+  };
 
   const toggleCondition = (item: HealthCondition) => {
     if (item === 'Ninguna') {
@@ -176,6 +196,8 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       fitnessLevel,
       healthConditions,
       equipmentAvailable,
+      dumbbellType,
+      availableWeightsKg: [...availableWeightsKg].sort((a, b) => a - b),
     });
 
     if (localDays.length === annualPlan.daysPerWeek) {
@@ -529,6 +551,128 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Inventario de Pesas y Sobrecarga Real */}
+          <div className="space-y-2 pt-1 border-t border-[#EDEEEF]">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-[#191C1D] block">
+                Tipo de Carga y Mancuernas
+              </label>
+              <span className="text-[10px] text-[#707973] font-medium">
+                Sobrecarga adaptada
+              </span>
+            </div>
+
+            {/* Selector de Tipo de Mancuerna */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { id: 'fijas', label: 'Pesas fijas' },
+                { id: 'ajustables_discos', label: 'Ajustables / discos' },
+                { id: 'peso_corporal_solamente', label: 'Solo peso corporal' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setDumbbellType(t.id as DumbbellType)}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold text-center transition-all ${
+                    dumbbellType === t.id
+                      ? 'bg-[#2D6A4F] text-white shadow-2xs'
+                      : 'bg-[#F3F4F5] text-[#404943] hover:bg-[#EDEEEF]'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Si tiene pesas, configurar los saltos reales en kg */}
+            {dumbbellType !== 'peso_corporal_solamente' && (
+              <div className="p-2.5 bg-[#F8F9FA] border border-[#EDEEEF] rounded-xl space-y-2 mt-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#191C1D]">
+                    Pesos disponibles en casa (kg):
+                  </span>
+                  <span className="text-[10px] text-[#707973]">
+                    Para sugerencias seguras
+                  </span>
+                </div>
+
+                {/* Chips de pesos actuales */}
+                <div className="flex flex-wrap gap-1.5">
+                  {availableWeightsKg.map((w) => (
+                    <span
+                      key={w}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-[#2D6A4F]/30 text-[#0F5238] font-bold text-xs shadow-2xs"
+                    >
+                      <span>{w} kg</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveWeight(w)}
+                        className="hover:text-red-500 transition-colors ml-0.5"
+                        title="Eliminar peso"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {availableWeightsKg.length === 0 && (
+                    <span className="text-[11px] text-[#707973] italic">
+                      Añade tus pesos para calibrar las sugerencias.
+                    </span>
+                  )}
+                </div>
+
+                {/* Accesos rápidos de pesos típicos */}
+                <div className="flex items-center gap-1 flex-wrap pt-1">
+                  <span className="text-[10px] text-[#707973] font-semibold mr-1">
+                    Añadir rápido:
+                  </span>
+                  {[1, 1.5, 2, 3, 4, 5, 6, 8, 10].map((quickW) => (
+                    <button
+                      key={quickW}
+                      type="button"
+                      disabled={availableWeightsKg.includes(quickW)}
+                      onClick={() => handleAddWeight(quickW)}
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded border transition-all ${
+                        availableWeightsKg.includes(quickW)
+                          ? 'opacity-40 border-transparent bg-transparent text-[#707973]'
+                          : 'bg-white border-[#C4C8C5] text-[#191C1D] hover:border-[#2D6A4F] hover:text-[#0F5238]'
+                      }`}
+                    >
+                      +{quickW}k
+                    </button>
+                  ))}
+                </div>
+
+                {/* Input personalizado */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    max="100"
+                    placeholder="Otro (ej: 7.5)"
+                    value={customWeightInput}
+                    onChange={(e) => setCustomWeightInput(e.target.value)}
+                    className="flex-1 h-8 px-2.5 text-xs rounded-lg border border-[#EDEEEF] bg-white text-[#191C1D] outline-hidden focus:border-[#2D6A4F]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const val = parseFloat(customWeightInput);
+                      if (!isNaN(val) && val > 0) {
+                        handleAddWeight(val);
+                        setCustomWeightInput('');
+                      }
+                    }}
+                    className="h-8 px-3 rounded-lg bg-[#2D6A4F] text-white text-xs font-bold hover:bg-[#245840] transition-colors"
+                  >
+                    Añadir kg
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

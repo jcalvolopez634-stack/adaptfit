@@ -6,6 +6,7 @@ import {
   AvailableEquipmentId,
   JointDiscomfortZone,
   ExerciseStepVisual,
+  EquipmentAvailableChoice,
 } from '../types';
 
 export interface CatalogExercise extends Exercise {
@@ -1470,12 +1471,30 @@ export interface SafeAlternativeOption extends CatalogExercise {
 
 export function findSafeAlternativesForExercise(
   current: Exercise | CatalogExercise,
-  limit = 3
+  limit = 3,
+  userEquipment?: EquipmentAvailableChoice | AvailableEquipmentId[]
 ): SafeAlternativeOption[] {
   const currentId = current.id || '';
   const currentTitle = (current.name || current.title || '').toLowerCase();
   const currentPattern = current.movementPattern || 'dominante_rodilla';
   const currentMuscle = (current.targetMuscleGroup || current.targetMuscles?.[0] || '').toLowerCase();
+
+  // Función de compatibilidad de equipamiento
+  const isEquipmentCompatible = (reqEquipment: AvailableEquipmentId[]): boolean => {
+    if (!userEquipment) return true;
+    if (userEquipment === 'Solo peso corporal y silla') {
+      return !reqEquipment.includes('bandas_elasticas') && !reqEquipment.includes('mancuernas');
+    }
+    if (userEquipment === 'Bandas elásticas') {
+      return !reqEquipment.includes('mancuernas');
+    }
+    if (Array.isArray(userEquipment)) {
+      return reqEquipment.every(
+        (item) => item === 'esterilla' || item === 'pared_libre' || userEquipment.includes(item)
+      );
+    }
+    return true;
+  };
 
   // Patrones motor prioritarios con variantes de menor impacto / cero cizalla
   const specificMap: Record<string, string[]> = {
@@ -1555,20 +1574,21 @@ export function findSafeAlternativesForExercise(
   const addedIds = new Set<string>();
   addedIds.add(currentId);
 
-  // 1. Agregar desde prioridades específicas
+  // 1. Agregar desde prioridades específicas (filtrando por material compatible primero)
   for (const pid of priorityIds) {
     if (addedIds.has(pid)) continue;
     const found = EXERCISES_DATABASE.find((e) => e.id === pid);
-    if (found) {
+    if (found && isEquipmentCompatible(found.requiredEquipment)) {
       matchedExercises.push(found);
       addedIds.add(pid);
     }
   }
 
-  // 2. Si se requieren más, buscar en catálogo por patrón o músculo con impacto ZERO o terapéutico
+  // 2. Si se requieren más, buscar en catálogo por patrón o músculo con impacto ZERO o terapéutico y material compatible
   if (matchedExercises.length < limit) {
     const candidates = EXERCISES_DATABASE.filter((e) => {
       if (addedIds.has(e.id)) return false;
+      if (!isEquipmentCompatible(e.requiredEquipment)) return false;
       const isZeroOrLow = e.impactLevel === 'ZERO' || e.impactLevel === 'LOW';
       const isTherapeutic =
         e.biomechanicalLevel === 'terapeutico_silla' ||
@@ -1596,7 +1616,7 @@ export function findSafeAlternativesForExercise(
     }
   }
 
-  // 3. Fallbacks universales de máxima seguridad articular
+  // 3. Fallbacks universales de máxima seguridad articular compatibles con material
   const generalFallbacks = [
     'legs_05_glute_bridge',
     'push_01_chair_chest_press',
@@ -1608,9 +1628,22 @@ export function findSafeAlternativesForExercise(
     if (matchedExercises.length >= limit) break;
     if (addedIds.has(fid)) continue;
     const found = EXERCISES_DATABASE.find((e) => e.id === fid);
-    if (found) {
+    if (found && isEquipmentCompatible(found.requiredEquipment)) {
       matchedExercises.push(found);
       addedIds.add(fid);
+    }
+  }
+
+  // Si aún faltara por ser demasiado estricto el material, rellenar con cualquier compatible
+  if (matchedExercises.length < limit) {
+    for (const fid of generalFallbacks) {
+      if (matchedExercises.length >= limit) break;
+      if (addedIds.has(fid)) continue;
+      const found = EXERCISES_DATABASE.find((e) => e.id === fid);
+      if (found) {
+        matchedExercises.push(found);
+        addedIds.add(fid);
+      }
     }
   }
 

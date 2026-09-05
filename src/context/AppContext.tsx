@@ -48,6 +48,7 @@ import {
   FitnessLevel,
   HealthCondition,
   EquipmentAvailableChoice,
+  DumbbellType,
 } from '../types';
 import { calculateBMI } from '../utils/anthropometry';
 import { EXERCISES_DATABASE, findSafeAlternativesForExercise, SafeAlternativeOption } from '../data/exercisesData';
@@ -1590,6 +1591,7 @@ export interface AppContextType {
   setFitnessLevel: (level: FitnessLevel) => void;
   toggleHealthCondition: (condition: HealthCondition) => void;
   setEquipmentAvailable: (equipment: EquipmentAvailableChoice) => void;
+  setDumbbellConfig: (type: DumbbellType, weights: number[]) => void;
   toggleDiscomfortZone: (zone: JointDiscomfortZone) => void;
   setMobilityLevel: (level: MobilityLevelId) => void;
   toggleEquipment: (eq: AvailableEquipmentId) => void;
@@ -1823,6 +1825,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             fitnessLevel: parsed.fitnessLevel || 'Iniciación / Recuperación',
             healthConditions: parsed.healthConditions || ['Ninguna'],
             equipmentAvailable: parsed.equipmentAvailable || 'Solo peso corporal y silla',
+            dumbbellType: parsed.dumbbellType || 'fijas',
+            availableWeightsKg: parsed.availableWeightsKg || [1, 2, 3, 4, 5],
             heightCm: parsed.heightCm,
             weightKg: parsed.weightKg,
             discomfortZones: parsed.discomfortZones || ['ninguna'],
@@ -1846,6 +1850,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       fitnessLevel: 'Iniciación / Recuperación',
       healthConditions: ['Ninguna'],
       equipmentAvailable: 'Solo peso corporal y silla',
+      dumbbellType: 'fijas',
+      availableWeightsKg: [1, 2, 3, 4, 5],
       heightCm: undefined,
       weightKg: undefined,
       discomfortZones: ['ninguna'],
@@ -2429,6 +2435,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
+  const setDumbbellConfig = useCallback((type: DumbbellType, weights: number[]) => {
+    setUserProfile((prev) => ({
+      ...prev,
+      dumbbellType: type,
+      availableWeightsKg: [...weights].sort((a, b) => a - b),
+    }));
+  }, []);
+
   const addAnthropometricRecord = useCallback(
     (record: Omit<AnthropometricRecord, 'id'>) => {
       const newRecord: AnthropometricRecord = {
@@ -2756,13 +2770,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         }
 
-        // Regla 5: Problemas de equilibrio -> Excluir apoyos inestables sin soporte
+        // Regla 5: Problemas de equilibrio -> Excluir zancadas libres y fijar apoyos estables en silla o pared
         if (hasBalanceIssues) {
-          if (
-            ex.biomechanicalLevel === 'avanzado_fuerza' &&
+          const isLunge =
+            ex.id.includes('lunge') ||
+            ex.id.includes('bulgarian') ||
+            ex.id === 'legs_11_reverse_lunges' ||
+            ex.id === 'legs_12_bulgarian_split_squat';
+          if (isLunge) {
+            return false;
+          }
+          // Si el ejercicio es de piernas de pie sin apoyo firme, exigir apoyo en pared o silla
+          const isStandingLegWithoutSupport =
+            (ex.movementPattern === 'dominante_rodilla' ||
+              ex.movementPattern === 'bisagra_cadera' ||
+              ex.movementPattern === 'pantorrillas_tobillo') &&
+            !ex.requiredEquipment.includes('silla_firme') &&
             !ex.requiredEquipment.includes('pared_libre') &&
-            !ex.requiredEquipment.includes('silla_firme')
-          ) {
+            !ex.id.includes('bridge') &&
+            !ex.id.includes('floor') &&
+            !ex.id.includes('seated') &&
+            ex.biomechanicalLevel !== 'terapeutico_silla';
+          if (isStandingLegWithoutSupport) {
             return false;
           }
         }
@@ -2777,8 +2806,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         return true;
       });
 
-      const sourcePool =
-        safePool.length >= targetCount ? safePool : EXERCISES_DATABASE;
+      // SEGURIDAD CLÍNICA ESTRICTA:
+      // Si el grupo seguro es reducido, NUNCA recurrir a la base de datos completa con contraindicaciones;
+      // en su lugar, duplicar variantes de bajo impacto o nivel terapéutico que pasaron el filtro.
+      let sourcePool = [...safePool];
+      if (sourcePool.length === 0) {
+        // Fallback garantizado de máxima seguridad articular sin impacto
+        const ultraSafeIds = [
+          'legs_05_glute_bridge',
+          'pull_01_seated_scapular_squeeze',
+          'core_01_seated_stomach_vacuum',
+          'legs_01_seated_knee_extensions',
+          'push_02_wall_isometric',
+        ];
+        sourcePool = EXERCISES_DATABASE.filter((e) => ultraSafeIds.includes(e.id));
+      }
+
+      // Duplicar variantes de bajo impacto o terapéuticas para alcanzar targetCount de forma 100% segura
+      if (sourcePool.length < targetCount) {
+        const therapeuticOrLow = sourcePool.filter(
+          (e) => e.impactLevel === 'ZERO' || e.impactLevel === 'LOW' || e.biomechanicalLevel === 'terapeutico_silla'
+        );
+        const poolToCycle = therapeuticOrLow.length > 0 ? therapeuticOrLow : sourcePool;
+        let cycleIdx = 0;
+        while (sourcePool.length < targetCount) {
+          const baseItem = poolToCycle[cycleIdx % poolToCycle.length];
+          sourcePool.push({
+            ...baseItem,
+            id: `${baseItem.id}_seguridad_dup_${sourcePool.length + 1}`,
+            subtitle: `${baseItem.subtitle || ''} (Variante Protegida)`.trim(),
+          });
+          cycleIdx++;
+        }
+      }
 
       const pushExercises = sourcePool.filter(
         (e) =>
@@ -2806,7 +2866,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         (e) => e.block === 'vuelta_a_la_calma'
       );
 
-      // INYECCIÓN CLÍNICA PRIORITARIA SEGÚN REGLAS MÉDICAS:
+      // INYECCIÓN CLÍNICA PRIORITARIA SEGÚN REGLAS MÉDICAS (sólo variantes seguras):
       if (hasKneeDiscomfort) {
         // Prescribir sentadilla a silla alta y puente glúteo en suelo
         const chairSquat = EXERCISES_DATABASE.find((e) => e.id === 'legs_04_chair_squat_stand');
@@ -3111,6 +3171,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const getPreviousExercisePerformance = useCallback(
     (exerciseId: string) => {
+      const dumbbellType = userProfile.dumbbellType || 'fijas';
+      const availableWeights =
+        userProfile.availableWeightsKg && userProfile.availableWeightsKg.length > 0
+          ? [...userProfile.availableWeightsKg].sort((a, b) => a - b)
+          : [1, 2, 3, 4, 5];
+      const isBodyweightOnly =
+        dumbbellType === 'peso_corporal_solamente' ||
+        userProfile.equipmentAvailable === 'Solo peso corporal y silla';
+
       for (const w of completedWorkouts) {
         if (w.exercisesCompleted) {
           const found = w.exercisesCompleted.find((e) => e.id === exerciseId);
@@ -3126,23 +3195,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             let suggestedReps: number = 10;
             let progressionMessage = '';
 
-            if (maxWeight > 0) {
-              if (maxReps >= 10) {
-                suggestedWeightKg = Number((maxWeight + 0.5).toFixed(1));
-                suggestedReps = 8;
-                progressionMessage = `Última sesión: ${maxWeight} kg × ${maxReps} reps. Sugerencia de sobrecarga: prueba con +0.5 kg (${suggestedWeightKg} kg) con técnica estricta.`;
+            if (isBodyweightOnly) {
+              // Progresión adaptada a peso corporal: repeticiones y tiempo bajo tensión / isometría
+              if (maxReps >= 12) {
+                suggestedWeightKg = 0;
+                suggestedReps = 12;
+                progressionMessage = `Última sesión: peso corporal × ${maxReps} reps. Prioridad sin material: mantén 12 reps e introduce una parada isométrica de 2 segundos en contracción máxima.`;
               } else {
-                suggestedWeightKg = maxWeight;
+                suggestedWeightKg = 0;
                 suggestedReps = maxReps + 1;
-                progressionMessage = `Última sesión: ${maxWeight} kg × ${maxReps} reps. Sugerencia de sobrecarga: mantén ${maxWeight} kg y busca ${maxReps + 1} reps con parada isométrica.`;
+                progressionMessage = `Última sesión: peso corporal × ${maxReps} reps. Sobrecarga por volumen: busca ${maxReps + 1} reps manteniendo técnica estricta y respiración diafragmática.`;
               }
             } else {
-              suggestedReps = maxReps >= 12 ? 8 : maxReps + 1;
-              suggestedWeightKg = maxReps >= 12 ? 1 : 0;
-              progressionMessage =
-                maxReps >= 12
-                  ? `Última sesión: peso corporal × ${maxReps} reps. Sugerencia: introduce una carga suave de 1-2 kg o variante de mayor palanca.`
-                  : `Última sesión: peso corporal × ${maxReps} reps. Sugerencia: intenta alcanzar ${maxReps + 1} reps manteniendo respiración controlada.`;
+              // Progresión adaptada al inventario real de mancuernas / discos
+              if (maxWeight > 0) {
+                const nextWeights = availableWeights.filter((weight) => weight > maxWeight);
+                if (maxReps >= 10) {
+                  if (nextWeights.length > 0) {
+                    const nextWeight = nextWeights[0];
+                    suggestedWeightKg = nextWeight;
+                    suggestedReps = 8;
+                    progressionMessage = `Última sesión: ${maxWeight} kg × ${maxReps} reps. ¡Objetivo superado! Salto real adaptado a tu material: ${nextWeight} kg (prueba 8 reps con control).`;
+                  } else {
+                    suggestedWeightKg = maxWeight;
+                    suggestedReps = maxReps + 1;
+                    progressionMessage = `Has alcanzado el peso máximo de tu inventario (${maxWeight} kg). Sobrecarga adaptada: busca ${maxReps + 1} reps o introduce una parada isométrica de 2 segundos.`;
+                  }
+                } else {
+                  suggestedWeightKg = maxWeight;
+                  suggestedReps = maxReps + 1;
+                  progressionMessage = `Última sesión: ${maxWeight} kg × ${maxReps} reps. Consolidación de carga: mantén ${maxWeight} kg y busca ${maxReps + 1} reps antes de subir de peso.`;
+                }
+              } else {
+                // Previo con peso corporal pero tiene pesas en el inventario
+                if (maxReps >= 10) {
+                  const firstWeight = availableWeights[0] || 1;
+                  suggestedWeightKg = firstWeight;
+                  suggestedReps = 8;
+                  progressionMessage = `Dominio con peso corporal (${maxReps} reps). Sugerencia: introduce tu primera carga disponible (${firstWeight} kg) para 8 reps controladas.`;
+                } else {
+                  suggestedWeightKg = 0;
+                  suggestedReps = maxReps + 1;
+                  progressionMessage = `Última sesión: peso corporal × ${maxReps} reps. Sugerencia: busca ${maxReps + 1} reps antes de añadir carga externa.`;
+                }
+              }
             }
 
             return {
@@ -3156,16 +3252,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
+      const defaultFirstWeight = isBodyweightOnly ? 0 : availableWeights[0] || 1;
       return {
         lastWeightKg: undefined,
         lastReps: undefined,
-        suggestedWeightKg: undefined,
+        suggestedWeightKg: isBodyweightOnly ? 0 : defaultFirstWeight,
         suggestedReps: 10,
-        progressionMessage:
-          'Primera sesión con este ejercicio: prioriza la colocación y el control antes de añadir carga adicional.',
+        progressionMessage: isBodyweightOnly
+          ? 'Primera sesión con este ejercicio: realiza las repeticiones con peso corporal priorizando la colocación y el ritmo.'
+          : `Primera sesión con este ejercicio: calibra sensaciones con peso corporal o tu carga mínima disponible (${defaultFirstWeight} kg).`,
       };
     },
-    [completedWorkouts]
+    [completedWorkouts, userProfile.dumbbellType, userProfile.availableWeightsKg, userProfile.equipmentAvailable]
   );
 
   // Motor de 3 Series: Saltar descanso interactivo e iniciar siguiente serie
@@ -3806,41 +3904,119 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     window.URL.revokeObjectURL(url);
   }, [annualPlan.selectedDays, annualPlan.minutesPerSession]);
 
-  // Clinical PDF Generator Simulation
+  // Clinical PDF / File Generator with Real Live Metrics
   const downloadClinicalReportPDF = useCallback(() => {
-    // Generate clean text/json file representing clinical report
-    const clinicalSummary = {
-      app: 'AdaptFit - Informe Clínico de Movilidad y Adherencia',
-      paciente: userProfile.name,
-      fechaReporte: new Date().toLocaleDateString('es-ES'),
-      perfil: {
-        nivelMovilidad: userProfile.mobilityLevel,
-        zonasDolorReportadas: userProfile.discomfortZones,
-        equipamiento: userProfile.availableEquipment,
+    const totalSessions = completedWorkouts.length;
+    const allIncidents = completedWorkouts.flatMap((w) => w.safetyIncidents || []);
+
+    // RPE numérico mapeado en vivo
+    const rpeMap: Record<string, number> = {
+      muy_suave: 2,
+      suave: 4,
+      moderado: 6,
+      algo_duro: 7,
+      duro: 8,
+      maximo: 10,
+    };
+    const rpeValues = completedWorkouts
+      .map((w) => rpeMap[w.rpe] || 5)
+      .filter((n) => !isNaN(n));
+    const averageRpe =
+      rpeValues.length > 0
+        ? (rpeValues.reduce((acc, curr) => acc + curr, 0) / rpeValues.length).toFixed(1)
+        : '0';
+
+    // Sesiones sin dolor
+    const painFreeSessions = completedWorkouts.filter(
+      (w) => !w.discomforts || w.discomforts.length === 0 || w.discomforts.includes('ninguna')
+    ).length;
+    const painFreeRate =
+      totalSessions > 0 ? Math.round((painFreeSessions / totalSessions) * 100) : 100;
+
+    // Tasa de adherencia real
+    const targetWeeklySessions = annualPlan.daysPerWeek || 3;
+    const realAdherenceRate = Math.min(
+      100,
+      Math.round((totalSessions / Math.max(1, targetWeeklySessions * 4)) * 100)
+    );
+
+    // Conteo real de intervenciones de seguridad
+    const substitutedIncidents = allIncidents.filter(
+      (i) => i.action === 'sustituido_por_alternativa'
+    );
+    const discardedIncidents = allIncidents.filter(
+      (i) => i.action === 'descartado_seguridad'
+    );
+
+    const dateStr = new Date().toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    const clinicalReportData = {
+      app: 'AdaptFit - Informe Clínico de Prescripción y Seguridad Articular',
+      fechaEmision: dateStr,
+      paciente: {
+        nombre: userProfile.name || 'Paciente',
+        sexoBiologico: userProfile.biologicalSex || 'Mujer',
+        nivelCondicion: userProfile.fitnessLevel || 'Iniciación / Recuperación',
+        condicionesMedicas: userProfile.healthConditions || ['Ninguna'],
+        zonasDolorDeclaradas: userProfile.discomfortZones || ['ninguna'],
+        materialDisponible: userProfile.equipmentAvailable || 'Solo peso corporal y silla',
+        tipoMancuernas: userProfile.dumbbellType || 'fijas',
+        pesosDisponiblesKg: userProfile.availableWeightsKg || [],
       },
-      metricasUltimos30Dias: {
-        rpePromedio: '4.2/10 (Suave y Seguro)',
-        dolorReportado: '0.8/10 (Mínimo)',
-        sesionesCompletadas: 12,
-        tasaAdherencia: '94%',
-        impactoArticular: '100% libre de impacto en rodillas',
+      metricasRealesComputadas: {
+        sesionesCompletadasTotales: totalSessions,
+        rpePromedioCalculado: totalSessions > 0 ? `${averageRpe} / 10` : 'Sin sesiones previas',
+        porcentajeSesionesSinDolor: `${painFreeRate}%`,
+        tasaAdherenciaEstimada: `${realAdherenceRate}%`,
+        paradasPreventivasRegistradas: allIncidents.length,
+        variantesSuavesSustituidas: substitutedIncidents.length,
+        ejerciciosRetiradosPorSeguridad: discardedIncidents.length,
       },
-      conclusionFisioterapeutica:
-        'El paciente muestra excelente adaptación neuromuscular y tolerancia a la carga progresiva en silla y bipedestación asistida sin picos de dolor.',
+      historialIncidenciasSeguridad: allIncidents.map((inc) => ({
+        fecha: inc.timestamp,
+        ejercicio: inc.exerciseTitle,
+        accion:
+          inc.action === 'sustituido_por_alternativa'
+            ? 'Sustituido por variante suave'
+            : 'Descartado preventivamente',
+        patron: inc.movementPattern,
+        motivo: inc.reason,
+        notaClinica: inc.clinicalNote,
+      })),
+      historialSesionesRecientes: completedWorkouts.slice(0, 10).map((w) => ({
+        id: w.id,
+        fecha: w.timestamp,
+        rutina: w.routineTitle,
+        duracionMinutos: w.durationMinutes,
+        rpe: w.rpe,
+        molestias: w.discomforts,
+        volumenTotalKg: w.volumeTotalKg || 0,
+      })),
+      conclusionClinica:
+        allIncidents.length > 0
+          ? `El paciente ha completado ${totalSessions} sesiones. Se han aplicado ${allIncidents.length} intervenciones preventivas automáticas de seguridad sin dolor continuado.`
+          : `El paciente ha completado ${totalSessions} sesiones con excelente tolerancia neuromuscular y cero incidencias articulares reportadas.`,
     };
 
-    const blob = new Blob([JSON.stringify(clinicalSummary, null, 2)], {
+    const blob = new Blob([JSON.stringify(clinicalReportData, null, 2)], {
       type: 'application/json',
     });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'informe_clinico_adaptfit.json');
+    const sanitizedName = userProfile.name
+      ? userProfile.name.toLowerCase().replace(/\s+/g, '_')
+      : 'paciente';
+    link.setAttribute('download', `informe_clinico_${sanitizedName}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  }, [userProfile]);
+  }, [userProfile, completedWorkouts, annualPlan.daysPerWeek]);
 
   const value = useMemo(
     () => ({
@@ -3856,6 +4032,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setFitnessLevel,
       toggleHealthCondition,
       setEquipmentAvailable,
+      setDumbbellConfig,
       toggleDiscomfortZone,
       setMobilityLevel,
       toggleEquipment,
@@ -3935,12 +4112,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }),
     [
       activeTab,
+      setActiveTab,
       currentScreen,
       screenHistory,
       navigateTo,
       goBack,
       userProfile,
       saveUserProfile,
+      setBiologicalSex,
+      setFitnessLevel,
+      toggleHealthCondition,
+      setEquipmentAvailable,
+      setDumbbellConfig,
       toggleDiscomfortZone,
       setMobilityLevel,
       toggleEquipment,
@@ -3999,6 +4182,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       toggleRestShield,
       roadStages,
       currentWorld,
+      setCurrentWorld,
       achievements,
       shareModalAchievement,
       openShareModal,
