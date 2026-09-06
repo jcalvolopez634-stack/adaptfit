@@ -1690,6 +1690,7 @@ export interface AppContextType {
     bmiCategory?: 'bajo_peso' | 'normopeso' | 'sobrepeso' | 'obesidad';
   }) => AnthropometricRecord;
   deleteAnthropometricRecord: (id: string) => void;
+  updateAnthropometricRecord: (id: string, record: Partial<AnthropometricRecord>) => void;
   updateHeightAndWeight: (heightCm: number, weightKg: number) => void;
   updateBodyGoals: (goals: Partial<BodyGoals>) => void;
   calculateBodyCompositionAdvice: (
@@ -2630,6 +2631,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteAnthropometricRecord = useCallback((id: string) => {
     setAnthropometricRecords((prev) => prev.filter((r) => r.id !== id));
   }, []);
+
+  const updateAnthropometricRecord = useCallback(
+    (id: string, updatedFields: Partial<AnthropometricRecord>) => {
+      setAnthropometricRecords((prev) =>
+        prev.map((r) => {
+          if (r.id === id) {
+            const height = updatedFields.heightCm ?? r.heightCm;
+            const weight = updatedFields.weightKg ?? r.weightKg;
+            const assessment = calculateBMI(weight, height);
+            return {
+              ...r,
+              ...updatedFields,
+              heightCm: height,
+              weightKg: weight,
+              bmi: updatedFields.bmi !== undefined ? updatedFields.bmi : assessment.bmi,
+              bmiCategory: updatedFields.bmiCategory || assessment.category,
+            };
+          }
+          return r;
+        })
+      );
+    },
+    []
+  );
 
   const updateHeightAndWeight = useCallback((heightCm: number, weightKg: number) => {
     const assessment = calculateBMI(weightKg, heightCm);
@@ -4790,6 +4815,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       anthropometricRecords,
       addAnthropometricRecord,
       deleteAnthropometricRecord,
+      updateAnthropometricRecord,
       updateHeightAndWeight,
       updateBodyGoals,
       calculateBodyCompositionAdvice: getBodyCompositionAdvice,
@@ -4888,6 +4914,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       anthropometricRecords,
       addAnthropometricRecord,
       deleteAnthropometricRecord,
+      updateAnthropometricRecord,
       updateHeightAndWeight,
       updateBodyGoals,
       getBodyCompositionAdvice,

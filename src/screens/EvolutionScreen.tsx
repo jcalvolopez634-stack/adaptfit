@@ -36,6 +36,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Award,
+  Pencil,
 } from 'lucide-react';
 import { calculateBMI, MEASUREMENT_GUIDES } from '../utils/anthropometry';
 import { BodyFocusZone, BodyRecompositionGoal } from '../types';
@@ -50,6 +51,8 @@ export const EvolutionScreen: React.FC = () => {
     userProfile,
     anthropometricRecords,
     addAnthropometricRecord,
+    updateAnthropometricRecord,
+    updateHeightAndWeight,
     bodyCompositionAdvice,
     recompositionAnalysis,
     bodyRecompositionMetrics,
@@ -58,7 +61,6 @@ export const EvolutionScreen: React.FC = () => {
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
-  const [showClinicalTable, setShowClinicalTable] = useState(false);
 
   // Tab State for Body Perimeters
   const [perimeterTab, setPerimeterTab] = useState<'tronco_brazos' | 'cintura_piernas'>('tronco_brazos');
@@ -79,6 +81,19 @@ export const EvolutionScreen: React.FC = () => {
   const [thighInput, setThighInput] = useState<string>('');
   const [notesInput, setNotesInput] = useState<string>('');
   const [saveToast, setSaveToast] = useState(false);
+
+  // Modal State for Baseline (Punto de Partida) Editing
+  const [isBaselineModalOpen, setIsBaselineModalOpen] = useState(false);
+  const [baseDateInput, setBaseDateInput] = useState<string>('');
+  const [baseWeightInput, setBaseWeightInput] = useState<string>('');
+  const [baseHeightInput, setBaseHeightInput] = useState<string>('');
+  const [baseWaistInput, setBaseWaistInput] = useState<string>('');
+  const [baseHipInput, setBaseHipInput] = useState<string>('');
+  const [baseChestInput, setBaseChestInput] = useState<string>('');
+  const [baseShouldersInput, setBaseShouldersInput] = useState<string>('');
+  const [baseArmInput, setBaseArmInput] = useState<string>('');
+  const [baseThighInput, setBaseThighInput] = useState<string>('');
+  const [baseToast, setBaseToast] = useState(false);
 
   const adjustInput = (
     setter: React.Dispatch<React.SetStateAction<string>>,
@@ -150,6 +165,71 @@ export const EvolutionScreen: React.FC = () => {
     setIsModalOpen(false);
     setSaveToast(true);
     setTimeout(() => setSaveToast(false), 3500);
+  };
+
+  // Open & Save Baseline (Punto de Partida) Handlers
+  const openBaselineModal = () => {
+    const base = chronologicalWeightRecords[0] || null;
+    setBaseDateInput(
+      base?.date
+        ? base.date.substring(0, 10)
+        : userProfile.createdAt
+        ? new Date(userProfile.createdAt).toISOString().substring(0, 10)
+        : new Date().toISOString().substring(0, 10)
+    );
+    setBaseWeightInput(
+      base?.weightKg
+        ? String(base.weightKg)
+        : userProfile.weightKg
+        ? String(userProfile.weightKg)
+        : ''
+    );
+    setBaseHeightInput(
+      base?.heightCm
+        ? String(base.heightCm)
+        : userProfile.heightCm
+        ? String(userProfile.heightCm)
+        : '165'
+    );
+    setBaseWaistInput(base?.waistCm ? String(base.waistCm) : '');
+    setBaseHipInput(base?.hipCm ? String(base.hipCm) : '');
+    setBaseChestInput(base?.chestCm ? String(base.chestCm) : '');
+    setBaseShouldersInput(base?.shouldersCm ? String(base.shouldersCm) : '');
+    setBaseArmInput(base?.armCm ? String(base.armCm) : '');
+    setBaseThighInput(base?.thighCm ? String(base.thighCm) : '');
+    setIsBaselineModalOpen(true);
+  };
+
+  const handleSaveBaseline = (e: React.FormEvent) => {
+    e.preventDefault();
+    const w = parseFloat(baseWeightInput);
+    const h = parseFloat(baseHeightInput);
+    if (!w || w <= 0 || !h || h <= 0) return;
+
+    const recordData = {
+      weightKg: w,
+      heightCm: h,
+      date: baseDateInput ? new Date(baseDateInput).toISOString() : new Date().toISOString(),
+      waistCm: baseWaistInput && parseFloat(baseWaistInput) > 0 ? parseFloat(baseWaistInput) : undefined,
+      hipCm: baseHipInput && parseFloat(baseHipInput) > 0 ? parseFloat(baseHipInput) : undefined,
+      chestCm: baseChestInput && parseFloat(baseChestInput) > 0 ? parseFloat(baseChestInput) : undefined,
+      shouldersCm: baseShouldersInput && parseFloat(baseShouldersInput) > 0 ? parseFloat(baseShouldersInput) : undefined,
+      armCm: baseArmInput && parseFloat(baseArmInput) > 0 ? parseFloat(baseArmInput) : undefined,
+      thighCm: baseThighInput && parseFloat(baseThighInput) > 0 ? parseFloat(baseThighInput) : undefined,
+      notes: 'Punto de partida (Día 1)',
+    };
+
+    const base = chronologicalWeightRecords[0] || null;
+    if (base) {
+      updateAnthropometricRecord(base.id, recordData);
+    } else {
+      addAnthropometricRecord(recordData);
+    }
+
+    updateHeightAndWeight(h, w);
+    setIsBaselineModalOpen(false);
+    setBaseToast(true);
+    setTimeout(() => setBaseToast(false), 3500);
   };
 
   // Objetivos de Recomposición
@@ -278,6 +358,129 @@ export const EvolutionScreen: React.FC = () => {
     const diff = Math.round((current - previous) * 10) / 10;
     return diff;
   }, [chronologicalWeightRecords]);
+
+  // Registro de Línea Base (Día 1) y Último Registro
+  const baselineRecord = chronologicalWeightRecords[0] || null;
+  const latestRecord = chronologicalWeightRecords[chronologicalWeightRecords.length - 1] || null;
+
+  // Asesor Corporal: Formato Telegráfico (📈 Tendencia, 💡 Pauta)
+  const telegraphicAnalysis = useMemo(() => {
+    const diffWaist = bodyRecompositionMetrics.deltaWaistCm;
+    const diffArm = bodyRecompositionMetrics.deltaArmCm;
+    const diffChest = bodyRecompositionMetrics.deltaChestCm;
+    const diffShoulders = bodyRecompositionMetrics.deltaShouldersCm;
+    const diffWeight = weightChangeDiff;
+
+    let trend = 'Composición corporal estable y masa muscular preservada.';
+    let pauta = 'Mantén la constancia en tus sesiones funcionales para afianzar tu fuerza y articulaciones.';
+
+    if (diffWaist !== undefined && diffWaist <= -0.5) {
+      const upperFirmOrGrew =
+        (diffArm !== undefined && diffArm >= 0) ||
+        (diffChest !== undefined && diffChest >= 0) ||
+        (diffShoulders !== undefined && diffShoulders >= 0);
+
+      if (upperFirmOrGrew) {
+        trend = `Cintura reduciendo (${diffWaist} cm) con musculatura superior firme.`;
+        pauta = `Mantén el ritmo actual de ${annualPlan.daysPerWeek || 3} días; el tono muscular y la pérdida de grasa visceral van sobre ruedas.`;
+      } else {
+        trend = `Reducción progresiva de cintura (${diffWaist} cm) y volumen general.`;
+        pauta = 'Asegura un buen aporte de proteína y descanso para blindar la masa muscular magra.';
+      }
+    } else if (
+      (diffArm !== undefined && diffArm >= 0.4) ||
+      (diffShoulders !== undefined && diffShoulders >= 0.4) ||
+      (diffChest !== undefined && diffChest >= 0.4)
+    ) {
+      trend = 'Ganancia de tono y densidad muscular en tronco y extremidades.';
+      pauta = 'Excelente adaptación biomecánica; continúa con cargas progresivas seguras sin impacto articular.';
+    } else if (diffWeight !== null && diffWeight <= -0.5) {
+      trend = `Descenso sostenido de peso (${diffWeight} kg) con adaptación positiva.`;
+      pauta = 'Combina tus entrenamientos con adecuada hidratación para sostener la energía en cada sesión.';
+    }
+
+    return { trend, pauta };
+  }, [bodyRecompositionMetrics, weightChangeDiff, annualPlan.daysPerWeek]);
+
+  // Micro-Insignias Dinámicas de Progreso
+  const progressBadges = useMemo(() => {
+    const badges: Array<{ icon: string; text: string; id: string }> = [];
+    const diffWaist = bodyRecompositionMetrics.deltaWaistCm;
+    const diffArm = bodyRecompositionMetrics.deltaArmCm;
+    const diffShoulders = bodyRecompositionMetrics.deltaShouldersCm;
+    const diffChest = bodyRecompositionMetrics.deltaChestCm;
+    const diffWeight = weightChangeDiff;
+
+    if (diffWaist !== undefined && diffWaist <= -0.5) {
+      badges.push({
+        id: 'waist',
+        icon: '🎯',
+        text: 'Cinturón pidiendo agujero nuevo',
+      });
+    }
+
+    if (
+      (diffArm !== undefined && diffArm > 0) ||
+      (diffShoulders !== undefined && diffShoulders > 0) ||
+      (diffChest !== undefined && diffChest > 0)
+    ) {
+      badges.push({
+        id: 'tone',
+        icon: '💥',
+        text: 'Camisetas apretando donde deben',
+      });
+    }
+
+    if (completedWorkouts.length >= 3 || streakDays >= 2) {
+      badges.push({
+        id: 'consistency',
+        icon: '🛡️',
+        text: 'Constancia de hierro: base blindada',
+      });
+    }
+
+    if (diffWeight !== null && diffWeight <= -0.5) {
+      badges.push({
+        id: 'weight',
+        icon: '⚡',
+        text: 'Paso a paso sin perder músculo',
+      });
+    }
+
+    if (badges.length === 0) {
+      badges.push({
+        id: 'welcome',
+        icon: '🌱',
+        text: 'Primeros pasos: cimentando el hábito',
+      });
+    }
+
+    return badges;
+  }, [bodyRecompositionMetrics, weightChangeDiff, completedWorkouts.length, streakDays]);
+
+  // Barra de Meta de Cintura
+  const waistGoalData = useMemo(() => {
+    const baseWaist = baselineRecord?.waistCm;
+    const currentWaist = latestRecord?.waistCm;
+
+    if (!baseWaist || !currentWaist) return null;
+
+    const targetWaist = currentBodyGoals.targetWaistCm || Math.max(50, baseWaist - 4);
+    const totalToReduce = baseWaist - targetWaist;
+
+    if (totalToReduce <= 0) return null;
+
+    const reducedSoFar = baseWaist - currentWaist;
+    const progressPercent = Math.min(100, Math.max(0, Math.round((reducedSoFar / totalToReduce) * 100)));
+
+    return {
+      baseWaist,
+      currentWaist,
+      targetWaist,
+      progressPercent,
+      reducedSoFar: Math.round(reducedSoFar * 10) / 10,
+    };
+  }, [baselineRecord, latestRecord, currentBodyGoals.targetWaistCm]);
 
   const handleDownloadPDF = () => {
     setIsDownloading(true);
@@ -432,6 +635,14 @@ export const EvolutionScreen: React.FC = () => {
           <div className="p-3 rounded-2xl bg-[#E7F3EC] border border-[#2D6A4F] text-[#0F5238] text-xs font-bold flex items-center gap-2 shadow-xs transition-all">
             <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
             <span>¡Registro antropométrico guardado y métricas actualizadas!</span>
+          </div>
+        )}
+
+        {/* Toast Notificación de Guardado de Punto de Partida */}
+        {baseToast && (
+          <div className="p-3 rounded-2xl bg-[#E7F3EC] border border-[#2D6A4F] text-[#0F5238] text-xs font-bold flex items-center gap-2 shadow-xs transition-all">
+            <CheckCircle2 className="w-4 h-4 text-[#2D6A4F] shrink-0" />
+            <span>¡Punto de partida (Día 1) actualizado y comparativas recalculadas!</span>
           </div>
         )}
 
@@ -600,233 +811,214 @@ export const EvolutionScreen: React.FC = () => {
           </div>
 
           {/* =========================================================
-              2.A DIAGNÓSTICO DEL ASESOR DE RECOMPOSICIÓN CORPORAL
+              2.A TARJETA PUNTO DE PARTIDA (DÍA 1)
               ========================================================= */}
-          <div
-            className={`p-4 rounded-2xl border space-y-3 transition-all ${
-              recompositionAnalysis.status === 'optima'
-                ? 'bg-[#E7F3EC] border-[#B1F0CE]'
-                : recompositionAnalysis.status === 'hipertrofia'
-                ? 'bg-[#EBF3FA] border-[#BDE0FE]'
-                : recompositionAnalysis.status === 'deficit_favorable'
-                ? 'bg-[#E7F3EC] border-[#B1F0CE]'
-                : recompositionAnalysis.status === 'mantenimiento'
-                ? 'bg-[#FFF6ED] border-[#F4A261]'
-                : 'bg-[#F8F9FA] border-[#E1E3E4]'
-            }`}
-          >
+          <div className="p-4 rounded-2xl bg-white border border-[#E1E3E4] space-y-3 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                {recompositionAnalysis.status === 'optima' ? (
-                  <Sparkles className="w-4 h-4 text-[#2D6A4F]" />
-                ) : recompositionAnalysis.status === 'hipertrofia' ? (
-                  <Dumbbell className="w-4 h-4 text-[#1D6FA5]" />
-                ) : recompositionAnalysis.status === 'deficit_favorable' ? (
-                  <TrendingDown className="w-4 h-4 text-[#2D6A4F]" />
-                ) : recompositionAnalysis.status === 'mantenimiento' ? (
-                  <ShieldAlert className="w-4 h-4 text-[#8E4E14]" />
-                ) : (
-                  <Heart className="w-4 h-4 text-[#2D6A4F]" />
-                )}
-                <strong className="text-xs font-black uppercase tracking-wider text-[#191C1D]">
-                  Diagnóstico del Asesor
+                <Calendar className="w-4 h-4 text-[#2D6A4F]" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#191C1D]">
+                  Punto de Partida (Día 1)
+                </h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={openBaselineModal}
+                className="px-2.5 py-1 rounded-xl bg-[#F3F4F5] hover:bg-[#E7F3EC] text-[#2D6A4F] text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer border border-[#CCD0D2]/60 hover:border-[#2D6A4F]"
+                title="Editar o completar datos de inicio"
+              >
+                <Pencil className="w-3 h-3" />
+                <span>Editar datos de inicio</span>
+              </button>
+            </div>
+
+            <div className="text-[11px] text-[#707973] flex items-center justify-between bg-[#F8F9FA] px-3 py-1.5 rounded-xl border border-[#EDEEEF]">
+              <span>Fecha de referencia:</span>
+              <strong className="text-[#191C1D] font-bold">
+                {baselineRecord?.date
+                  ? new Date(baselineRecord.date).toLocaleDateString('es-ES', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : userProfile.createdAt
+                  ? new Date(userProfile.createdAt).toLocaleDateString('es-ES', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : 'Día de inicio'}
+              </strong>
+            </div>
+
+            {/* Resumen en chips de las medidas iniciales */}
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+              <div className="p-2 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+                <span className="text-[9px] uppercase font-bold text-[#707973] block">Peso</span>
+                <strong className="text-xs font-black text-[#191C1D]">
+                  {baselineRecord?.weightKg ?? userProfile.weightKg ?? '--'} kg
                 </strong>
               </div>
 
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold shadow-2xs ${recompositionAnalysis.badgeBg} ${recompositionAnalysis.badgeText}`}
-              >
-                {recompositionAnalysis.statusBadge || recompositionAnalysis.statusTitle}
+              <div className="p-2 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+                <span className="text-[9px] uppercase font-bold text-[#707973] block">Cintura</span>
+                <strong className="text-xs font-black text-[#191C1D]">
+                  {baselineRecord?.waistCm ? `${baselineRecord.waistCm} cm` : '--'}
+                </strong>
+              </div>
+
+              <div className="p-2 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+                <span className="text-[9px] uppercase font-bold text-[#707973] block">Pecho</span>
+                <strong className="text-xs font-black text-[#191C1D]">
+                  {baselineRecord?.chestCm ? `${baselineRecord.chestCm} cm` : '--'}
+                </strong>
+              </div>
+
+              <div className="p-2 rounded-xl bg-[#F8F9FA] border border-[#EDEEEF]">
+                <span className="text-[9px] uppercase font-bold text-[#707973] block">Brazo</span>
+                <strong className="text-xs font-black text-[#191C1D]">
+                  {baselineRecord?.armCm ? `${baselineRecord.armCm} cm` : '--'}
+                </strong>
+              </div>
+            </div>
+
+            {(!baselineRecord?.waistCm || !baselineRecord?.chestCm) && (
+              <p className="text-[10px] text-[#8E4E14] bg-[#FFF6ED] p-2 rounded-xl border border-[#F4A261]/40 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  Pulsa en "Editar datos de inicio" para añadir tus contornos del Día 1 y activar las comparativas de recomposición corporal.
+                </span>
+              </p>
+            )}
+          </div>
+
+          {/* =========================================================
+              2.B ASESOR CORPORAL: FORMATO TELEGRÁFICO (SIN PALABROS)
+              ========================================================= */}
+          <div className="p-4 rounded-2xl bg-[#E7F3EC] border border-[#B1F0CE] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-[#2D6A4F]" />
+                <strong className="text-xs font-black uppercase tracking-wider text-[#191C1D]">
+                  Asesor Corporal
+                </strong>
+              </div>
+
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-white text-[#0F5238] shadow-2xs border border-[#B1F0CE]">
+                {bodyRecompositionMetrics.isFavorableRecomposition ? 'Recomposición Favorable' : 'Constancia Activa'}
               </span>
             </div>
 
-            {/* Titular y Explicación Clínica de la Composición */}
-            <div className="space-y-1">
-              <h3 className="text-xs font-black text-[#191C1D] leading-snug">
-                {recompositionAnalysis.summaryMessage}
-              </h3>
-              <p className="text-xs text-[#42474E] leading-relaxed">
-                {recompositionAnalysis.crossEvaluationDetail}
-              </p>
-            </div>
-
-            {/* Pautas numéricas de referencia OMS */}
-            <div className="grid grid-cols-2 gap-2 bg-white/80 p-2.5 rounded-xl text-xs border border-[#EDEEEF]">
-              <div>
-                <span className="text-[10px] font-bold text-[#707973] block">
-                  Rango Saludable OMS ({currentHeightCm} cm):
-                </span>
-                <strong className="text-[#0F5238] font-black text-xs">
-                  {bodyCompositionAdvice.minHealthyWeightKg} – {bodyCompositionAdvice.maxHealthyWeightKg} kg
-                </strong>
-              </div>
-
-              <div>
-                <span className="text-[10px] font-bold text-[#707973] block">
-                  Ritmo Seguro Sostenible:
-                </span>
-                <strong className="text-[#0F5238] font-black text-xs">
-                  0.3 – 0.5 kg / semana
-                </strong>
-              </div>
-            </div>
-
-            {/* Biomarcadores Clínicos de Grasa Visceral y Masa Apendicular */}
-            <div className="p-2.5 rounded-xl bg-white/90 border border-[#EDEEEF] space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase text-[#707973] tracking-wider">
-                  Biomarcadores Clínicos Clave
-                </span>
-                {bodyRecompositionMetrics.isFavorableRecomposition && (
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-[#E7F3EC] text-[#0F5238]">
-                    Recomposición Favorable
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 rounded-lg bg-[#F8F9FA] border border-[#E1E3E4]">
-                  <span className="text-[10px] font-bold text-[#707973] block">
-                    Grasa Visceral / ICC (OMS)
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-0.5">
-                    <strong className="text-sm font-black text-[#191C1D]">
-                      {bodyRecompositionMetrics.waistHipRatio
-                        ? bodyRecompositionMetrics.waistHipRatio.toFixed(2)
-                        : '--'}
-                    </strong>
-                    <span className="text-[10px] text-[#707973]">
-                      ({bodyRecompositionMetrics.waistHipRisk || 'Bajo riesgo'})
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-2 rounded-lg bg-[#F8F9FA] border border-[#E1E3E4]">
-                  <span className="text-[10px] font-bold text-[#707973] block">
-                    Masa Magra Periférica
-                  </span>
-                  <div className="flex items-baseline gap-1 mt-0.5">
-                    <strong className="text-xs font-black text-[#0F5238]">
-                      {bodyRecompositionMetrics.deltaArmCm !== undefined || bodyRecompositionMetrics.deltaThighCm !== undefined
-                        ? `Brazo: ${bodyRecompositionMetrics.deltaArmCm !== undefined ? (bodyRecompositionMetrics.deltaArmCm > 0 ? `+${bodyRecompositionMetrics.deltaArmCm}` : bodyRecompositionMetrics.deltaArmCm) : 0} | Muslo: ${bodyRecompositionMetrics.deltaThighCm !== undefined ? (bodyRecompositionMetrics.deltaThighCm > 0 ? `+${bodyRecompositionMetrics.deltaThighCm}` : bodyRecompositionMetrics.deltaThighCm) : 0} cm`
-                        : 'Estable'}
-                    </strong>
-                  </div>
+            <div className="space-y-1.5 text-xs text-[#2A3E33]">
+              <div className="flex items-start gap-2 bg-white/80 p-2.5 rounded-xl border border-[#D8ECE1]">
+                <span className="text-sm shrink-0">📈</span>
+                <div className="leading-snug">
+                  <strong className="font-black text-[#191C1D]">Tendencia: </strong>
+                  <span>{telegraphicAnalysis.trend}</span>
                 </div>
               </div>
 
-              {/* Botón para desplegar Tabla Comparativa Clínica */}
-              <button
-                type="button"
-                onClick={() => setShowClinicalTable(!showClinicalTable)}
-                className="w-full py-1.5 px-2 rounded-lg bg-[#E7F3EC] hover:bg-[#d8ece1] text-[#0F5238] text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Activity className="w-3.5 h-3.5" />
-                <span>
-                  {showClinicalTable
-                    ? 'Ocultar Auditoría Antropométrica'
-                    : 'Ver Auditoría Clínica (Línea Base vs Actual)'}
-                </span>
-                <ChevronRight
-                  className={`w-3.5 h-3.5 transition-transform ${
-                    showClinicalTable ? 'rotate-90' : ''
-                  }`}
-                />
-              </button>
-
-              {/* Desglose de la Tabla Comparativa Clínica */}
-              {showClinicalTable && (
-                <div className="pt-2 border-t border-[#EDEEEF] space-y-2">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-[11px]">
-                      <thead>
-                        <tr className="border-b border-[#CCD0D2] text-[10px] font-extrabold uppercase text-[#707973]">
-                          <th className="py-1 pr-2">Medida</th>
-                          <th className="py-1 px-1">Base</th>
-                          <th className="py-1 px-1">Actual</th>
-                          <th className="py-1 px-1">Δ</th>
-                          <th className="py-1 pl-2">Criterio Clínico</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#EDEEEF]">
-                        {bodyRecompositionMetrics.comparisonTable.map((row, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-[#F3F4F5]/60 transition-colors">
-                            <td className="py-1.5 pr-2 font-bold text-[#191C1D]">{row.parameter}</td>
-                            <td className="py-1.5 px-1 text-[#707973]">{row.initial}</td>
-                            <td className="py-1.5 px-1 font-bold text-[#191C1D]">{row.current}</td>
-                            <td className="py-1.5 px-1">
-                              <span
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
-                                  row.isFavorable
-                                    ? 'bg-[#E7F3EC] text-[#0F5238]'
-                                    : 'bg-[#FFF6ED] text-[#8E4E14]'
-                                }`}
-                              >
-                                {row.delta}
-                              </span>
-                            </td>
-                            <td className="py-1.5 pl-2 text-[10px] text-[#42474E] leading-tight">
-                              {row.clinicalCriterion}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="p-2 rounded-lg bg-[#F8F9FA] text-[10px] text-[#42474E] leading-relaxed">
-                    <strong>Dictamen Clínico:</strong> {bodyRecompositionMetrics.diagnosticSummary}
-                  </div>
+              <div className="flex items-start gap-2 bg-white/80 p-2.5 rounded-xl border border-[#D8ECE1]">
+                <span className="text-sm shrink-0">💡</span>
+                <div className="leading-snug">
+                  <strong className="font-black text-[#191C1D]">Pauta: </strong>
+                  <span>{telegraphicAnalysis.pauta}</span>
                 </div>
-              )}
+              </div>
+            </div>
+          </div>
+
+          {/* =========================================================
+              2.C METAS PERSONALES Y LOGROS VISUALES
+              ========================================================= */}
+          <div className="p-4 rounded-2xl bg-white border border-[#E1E3E4] space-y-3 shadow-2xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-[#2D6A4F]" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#191C1D]">
+                  Metas y Logros
+                </h3>
+              </div>
+
+              <span className="text-[10px] font-bold text-[#2D6A4F] bg-[#E7F3EC] px-2 py-0.5 rounded-full">
+                Evolución Funcional
+              </span>
             </div>
 
-            {/* Recomendaciones Biomecánicas de Recomposición */}
-            {recompositionAnalysis.biomechanicAdvice.length > 0 && (
-              <div className="pt-2 border-t border-black/5 space-y-1.5">
-                <span className="text-[10px] font-extrabold uppercase text-[#707973] block tracking-wider">
-                  Directrices Clínicas AdaptFit
-                </span>
-                <ul className="space-y-1 text-[11px] text-[#2A3E33]">
-                  {recompositionAnalysis.biomechanicAdvice.map((adv, idx) => (
-                    <li key={idx} className="flex items-start gap-1.5">
-                      <Check className="w-3.5 h-3.5 text-[#2D6A4F] shrink-0 mt-0.5" />
-                      <span>{adv}</span>
-                    </li>
-                  ))}
-                </ul>
+            {/* Barra de Progreso de Cintura o Constancia */}
+            {waistGoalData ? (
+              <div className="space-y-1.5 bg-[#F8F9FA] p-3 rounded-xl border border-[#EDEEEF]">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-[#191C1D] flex items-center gap-1">
+                    <Ruler className="w-3 h-3 text-[#2D6A4F]" />
+                    Objetivo de Cintura ({waistGoalData.baseWaist} cm ➔ {waistGoalData.targetWaist} cm)
+                  </span>
+                  <strong className="text-[#0F5238] font-black text-xs">
+                    {waistGoalData.progressPercent}%
+                  </strong>
+                </div>
+
+                <div className="w-full h-2.5 bg-[#EDEEEF] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#2D6A4F] rounded-full transition-all duration-500"
+                    style={{ width: `${waistGoalData.progressPercent}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-[#707973]">
+                  <span>Reducción acumulada: {waistGoalData.reducedSoFar > 0 ? `-${waistGoalData.reducedSoFar}` : waistGoalData.reducedSoFar} cm</span>
+                  <span>Meta: {waistGoalData.targetWaist} cm</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5 bg-[#F8F9FA] p-3 rounded-xl border border-[#EDEEEF]">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-[#191C1D] flex items-center gap-1">
+                    <Activity className="w-3 h-3 text-[#2D6A4F]" />
+                    Hábito de Entrenamiento Mensual
+                  </span>
+                  <strong className="text-[#0F5238] font-black text-xs">
+                    {Math.min(100, Math.round((totalSessions / Math.max(1, (annualPlan.daysPerWeek || 3) * 4)) * 100))}%
+                  </strong>
+                </div>
+
+                <div className="w-full h-2.5 bg-[#EDEEEF] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#2D6A4F] rounded-full transition-all duration-500"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round((totalSessions / Math.max(1, (annualPlan.daysPerWeek || 3) * 4)) * 100)
+                      )}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-[#707973]">
+                  <span>{totalSessions} sesiones completadas</span>
+                  <span>Meta mensual: {(annualPlan.daysPerWeek || 3) * 4} sesiones</span>
+                </div>
               </div>
             )}
 
-            {/* Pautas para Zonas de Enfoque Seleccionadas */}
-            {recompositionAnalysis.focusZonesAdvice.length > 0 && (
-              <div className="pt-2 border-t border-black/5 space-y-1.5">
-                <span className="text-[10px] font-extrabold uppercase text-[#707973] block tracking-wider">
-                  Enfoque Biomecánico Personalizado
-                </span>
-                <div className="space-y-1.5">
-                  {recompositionAnalysis.focusZonesAdvice.map((fItem) => (
-                    <div
-                      key={fItem.zone}
-                      className="p-2.5 rounded-xl bg-white/90 border border-[#EDEEEF] text-xs space-y-1"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-[#191C1D] flex items-center gap-1">
-                          <Target className="w-3 h-3 text-[#2D6A4F]" />
-                          {fItem.label}
-                        </span>
-                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-[#E7F3EC] text-[#0F5238]">
-                          {fItem.targetMuscle}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#42474E] leading-relaxed">
-                        {fItem.biomechanicSafetyTip}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+            {/* Dynamic micro-insignias con guiño divertido */}
+            <div className="pt-2 border-t border-[#EDEEEF] space-y-1.5">
+              <span className="text-[10px] font-extrabold uppercase text-[#707973] block tracking-wider">
+                Logros y Victorias Reales:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {progressBadges.map((badge) => (
+                  <span
+                    key={badge.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black bg-[#E7F3EC] text-[#0F5238] border border-[#B1F0CE] shadow-2xs"
+                  >
+                    <span>{badge.icon}</span>
+                    <span>{badge.text}</span>
+                  </span>
+                ))}
               </div>
-            )}
+            </div>
           </div>
 
           {/* =========================================================
@@ -1137,8 +1329,8 @@ export const EvolutionScreen: React.FC = () => {
               </button>
             </div>
 
-            {/* Lista y Comparador Visual según la Pestaña Activa */}
-            <div className="space-y-2">
+            {/* Cuadrícula de Tarjetas Móviles Compactas (Grid de 2 Columnas) */}
+            <div className="grid grid-cols-2 gap-2.5">
               {(perimeterTab === 'tronco_brazos'
                 ? [
                     {
@@ -1156,7 +1348,7 @@ export const EvolutionScreen: React.FC = () => {
                     {
                       key: 'arm',
                       guideKey: 'brazo',
-                      label: 'Brazo / Bíceps',
+                      label: 'Brazo',
                       comp: recompositionAnalysis.perimetersComparison?.arm,
                     },
                   ]
@@ -1188,71 +1380,44 @@ export const EvolutionScreen: React.FC = () => {
                 return (
                   <div
                     key={item.key}
-                    className="p-3 rounded-2xl bg-[#F8F9FA] border border-[#E1E3E4] space-y-2"
+                    className="p-3.5 rounded-2xl bg-[#F8F9FA] border border-[#E1E3E4] flex flex-col justify-between shadow-2xs hover:border-[#2D6A4F]/40 transition-all"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-extrabold text-[#191C1D]">
-                          {item.label}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setActiveGuideKey(item.guideKey)}
-                          className="w-5 h-5 rounded-full bg-[#E7F3EC] text-[#2D6A4F] hover:bg-[#2D6A4F] hover:text-white flex items-center justify-center transition-all cursor-pointer"
-                          title={`Ver guía anatómica de medición de ${item.label}`}
-                        >
-                          <HelpCircle className="w-3 h-3" />
-                        </button>
-                      </div>
+                      <span className="text-[11px] font-bold text-[#707973] truncate">
+                        {item.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveGuideKey(item.guideKey)}
+                        className="w-5 h-5 rounded-full bg-[#E7F3EC] text-[#2D6A4F] hover:bg-[#2D6A4F] hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0"
+                        title={`Ver guía de medición de ${item.label}`}
+                      >
+                        <HelpCircle className="w-3 h-3" />
+                      </button>
+                    </div>
 
-                      {/* Diferencia con código de colores */}
-                      {hasDiff ? (
-                        <div
-                          className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black shadow-2xs ${
+                    <div className="my-2 flex items-baseline justify-between gap-1">
+                      <strong className="text-xl font-black text-[#191C1D]">
+                        {hasMeasurements ? `${comp.latest} cm` : '--'}
+                      </strong>
+                      {hasDiff && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-black shrink-0 ${
                             comp?.isPositiveChange
-                              ? 'bg-[#E7F3EC] text-[#0F5238] border border-[#B1F0CE]'
-                              : 'bg-[#FFF6ED] text-[#8E4E14] border border-[#F4A261]'
+                              ? 'bg-[#E7F3EC] text-[#0F5238]'
+                              : 'bg-[#FFF6ED] text-[#8E4E14]'
                           }`}
                         >
-                          {comp?.diff && comp.diff < 0 ? (
-                            <TrendingDown className="w-3.5 h-3.5" />
-                          ) : comp?.diff && comp.diff > 0 ? (
-                            <TrendingUp className="w-3.5 h-3.5" />
-                          ) : (
-                            <Check className="w-3.5 h-3.5" />
-                          )}
-                          <span>{comp?.changeLabel}</span>
-                        </div>
-                      ) : hasMeasurements ? (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#EDEEEF] text-[#707973]">
-                          1ª Medición (Base)
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#EDEEEF] text-[#707973]">
-                          No registrado
+                          {comp?.changeLabel}
                         </span>
                       )}
                     </div>
 
-                    {/* Comparativa: Inicial vs Actual */}
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#EDEEEF]/70 text-xs">
-                      <div className="bg-white p-2 rounded-xl border border-[#EDEEEF]">
-                        <span className="text-[10px] font-bold uppercase text-[#707973] block">
-                          Primera medición
-                        </span>
-                        <strong className="text-sm font-black text-[#191C1D]">
-                          {comp?.initial !== undefined ? `${comp.initial} cm` : '--'}
-                        </strong>
-                      </div>
-
-                      <div className="bg-white p-2 rounded-xl border border-[#EDEEEF]">
-                        <span className="text-[10px] font-bold uppercase text-[#707973] block">
-                          Última medición
-                        </span>
-                        <strong className="text-sm font-black text-[#191C1D]">
-                          {comp?.latest !== undefined ? `${comp.latest} cm` : '--'}
-                        </strong>
-                      </div>
+                    <div className="pt-2 border-t border-[#EDEEEF] flex items-center justify-between text-[10px] text-[#707973]">
+                      <span>Inicio:</span>
+                      <strong className="text-[#191C1D] font-semibold">
+                        {comp?.initial !== undefined ? `${comp.initial} cm` : '--'}
+                      </strong>
                     </div>
                   </div>
                 );
@@ -1288,6 +1453,16 @@ export const EvolutionScreen: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Botón Accesible para Registrar Medición de Perímetros */}
+            <button
+              type="button"
+              onClick={openRegisterModal}
+              className="w-full py-2.5 px-3 rounded-2xl bg-[#F8F9FA] hover:bg-[#E7F3EC] text-[#2D6A4F] text-xs font-bold flex items-center justify-center gap-1.5 border border-[#CCD0D2]/70 hover:border-[#2D6A4F] transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Registrar Medición de Contornos</span>
+            </button>
           </div>
         </section>
 
@@ -1962,8 +2137,230 @@ export const EvolutionScreen: React.FC = () => {
       )}
 
       {/* =========================================================
-          MODAL DE GUÍA ANATÓMICA DE MEDICIÓN
+          MODAL DE CONFIGURACIÓN DE PUNTO DE PARTIDA (DÍA 1)
           ========================================================= */}
+      {isBaselineModalOpen && (
+        <div
+          id="modal-backdrop-baseline"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-[#E1E3E4] space-y-4 max-h-[92vh] overflow-y-auto animate-in fade-in zoom-in duration-150">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between border-b border-[#EDEEEF] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-[#191C1D]">
+                    Punto de Partida (Día 1)
+                  </h3>
+                  <p className="text-[10px] text-[#707973]">
+                    Línea base para comparativas de recomposición
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsBaselineModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-[#F3F4F5] hover:bg-[#EDEEEF] text-[#707973] hover:text-[#191C1D] flex items-center justify-center transition-all cursor-pointer"
+                title="Cerrar"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBaseline} className="space-y-3.5">
+              {/* Fecha de inicio */}
+              <div>
+                <label className="block text-[11px] font-bold text-[#191C1D] mb-1">
+                  Fecha de Inicio
+                </label>
+                <input
+                  type="date"
+                  value={baseDateInput}
+                  onChange={(e) => setBaseDateInput(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl bg-[#F8F9FA] border border-[#CCD0D2] focus:border-[#2D6A4F] focus:bg-white text-xs font-bold text-[#191C1D] outline-none"
+                />
+              </div>
+
+              {/* Peso y Estatura Base */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Peso inicial */}
+                <div>
+                  <label className="block text-[10px] font-bold text-[#191C1D] mb-1">
+                    Peso Inicial (kg) *
+                  </label>
+                  <div className="flex items-center rounded-xl bg-[#F8F9FA] border border-[#CCD0D2] overflow-hidden focus-within:border-[#2D6A4F]">
+                    <button
+                      type="button"
+                      onClick={() => adjustInput(setBaseWeightInput, baseWeightInput, -0.2)}
+                      className="w-7 h-9 flex items-center justify-center text-[#707973] hover:bg-[#EDEEEF] text-xs font-black cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="30"
+                      max="300"
+                      required
+                      value={baseWeightInput}
+                      onChange={(e) => setBaseWeightInput(e.target.value)}
+                      className="w-full text-center text-xs font-black text-[#191C1D] bg-transparent outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => adjustInput(setBaseWeightInput, baseWeightInput, 0.2)}
+                      className="w-7 h-9 flex items-center justify-center text-[#707973] hover:bg-[#EDEEEF] text-xs font-black cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Estatura inicial */}
+                <div>
+                  <label className="block text-[10px] font-bold text-[#191C1D] mb-1">
+                    Estatura (cm) *
+                  </label>
+                  <div className="flex items-center rounded-xl bg-[#F8F9FA] border border-[#CCD0D2] overflow-hidden focus-within:border-[#2D6A4F]">
+                    <button
+                      type="button"
+                      onClick={() => adjustInput(setBaseHeightInput, baseHeightInput, -1)}
+                      className="w-7 h-9 flex items-center justify-center text-[#707973] hover:bg-[#EDEEEF] text-xs font-black cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      step="1"
+                      min="100"
+                      max="250"
+                      required
+                      value={baseHeightInput}
+                      onChange={(e) => setBaseHeightInput(e.target.value)}
+                      className="w-full text-center text-xs font-black text-[#191C1D] bg-transparent outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => adjustInput(setBaseHeightInput, baseHeightInput, 1)}
+                      className="w-7 h-9 flex items-center justify-center text-[#707973] hover:bg-[#EDEEEF] text-xs font-black cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Perímetros Iniciales: Tronco y Brazos */}
+              <div className="space-y-1.5 pt-2 border-t border-[#EDEEEF]">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#2D6A4F] block">
+                  Tronco y Brazos Iniciales (cm)
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[9px] font-bold text-[#707973] mb-0.5">Hombros</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="cm"
+                      value={baseShouldersInput}
+                      onChange={(e) => setBaseShouldersInput(e.target.value)}
+                      className="w-full h-8 px-2 text-center rounded-lg bg-[#F8F9FA] border border-[#CCD0D2] focus:border-[#2D6A4F] focus:bg-white text-xs font-bold text-[#191C1D] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-[#707973] mb-0.5">Pecho</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="cm"
+                      value={baseChestInput}
+                      onChange={(e) => setBaseChestInput(e.target.value)}
+                      className="w-full h-8 px-2 text-center rounded-lg bg-[#F8F9FA] border border-[#CCD0D2] focus:border-[#2D6A4F] focus:bg-white text-xs font-bold text-[#191C1D] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-[#707973] mb-0.5">Brazo</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="cm"
+                      value={baseArmInput}
+                      onChange={(e) => setBaseArmInput(e.target.value)}
+                      className="w-full h-8 px-2 text-center rounded-lg bg-[#F8F9FA] border border-[#CCD0D2] focus:border-[#2D6A4F] focus:bg-white text-xs font-bold text-[#191C1D] outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Perímetros Iniciales: Cintura y Piernas */}
+              <div className="space-y-1.5 pt-2 border-t border-[#EDEEEF]">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#2D6A4F] block">
+                  Cintura y Piernas Iniciales (cm)
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[9px] font-bold text-[#707973] mb-0.5">Cintura</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="cm"
+                      value={baseWaistInput}
+                      onChange={(e) => setBaseWaistInput(e.target.value)}
+                      className="w-full h-8 px-2 text-center rounded-lg bg-[#F8F9FA] border border-[#CCD0D2] focus:border-[#2D6A4F] focus:bg-white text-xs font-bold text-[#191C1D] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-[#707973] mb-0.5">Cadera</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="cm"
+                      value={baseHipInput}
+                      onChange={(e) => setBaseHipInput(e.target.value)}
+                      className="w-full h-8 px-2 text-center rounded-lg bg-[#F8F9FA] border border-[#CCD0D2] focus:border-[#2D6A4F] focus:bg-white text-xs font-bold text-[#191C1D] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-[#707973] mb-0.5">Muslo</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      placeholder="cm"
+                      value={baseThighInput}
+                      onChange={(e) => setBaseThighInput(e.target.value)}
+                      className="w-full h-8 px-2 text-center rounded-lg bg-[#F8F9FA] border border-[#CCD0D2] focus:border-[#2D6A4F] focus:bg-white text-xs font-bold text-[#191C1D] outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBaselineModalOpen(false)}
+                  className="flex-1 h-11 rounded-xl bg-[#F3F4F5] hover:bg-[#EDEEEF] text-[#191C1D] text-xs font-bold transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  className="flex-1 h-11 rounded-xl bg-[#2D6A4F] hover:bg-[#1b4332] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  Guardar Día 1
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {activeGuideKey && MEASUREMENT_GUIDES[activeGuideKey] && (
         <div
           id="modal-backdrop-guide"
