@@ -35,6 +35,8 @@ import { VictoriesWallScreen } from './screens/VictoriesWallScreen';
 import { ShareCardModal } from './screens/ShareCardModal';
 import { YearRoadScreen } from './screens/YearRoadScreen';
 import { RestShieldScreen } from './screens/RestShieldScreen';
+import { EvolutionScreen } from './screens/EvolutionScreen';
+import { CalendarScreen } from './screens/CalendarScreen';
 import { ClinicalReportScreen } from './screens/ClinicalReportScreen';
 import { CalendarSyncScreen } from './screens/CalendarSyncScreen';
 import { ExerciseLibraryScreen } from './screens/ExerciseLibraryScreen';
@@ -47,7 +49,9 @@ const MAIN_NAV_SCREENS: ScreenId[] = [
   'year_road',
   'victory_wall',
   'calendar_sync',
+  'calendar',
   'clinical_report',
+  'evolution',
 ];
 
 function AdaptFitShell() {
@@ -95,10 +99,12 @@ function AdaptFitShell() {
         return <RestShieldScreen />;
 
       case 'clinical_report':
-        return <ClinicalReportScreen />;
+      case 'evolution':
+        return <EvolutionScreen />;
 
       case 'calendar_sync':
-        return <CalendarSyncScreen />;
+      case 'calendar':
+        return <CalendarScreen />;
 
       case 'exercise_library':
         return <ExerciseLibraryScreen />;

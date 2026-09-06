@@ -497,5 +497,7 @@ export type ScreenId =
   | 'year_road'
   | 'rest_shield'
   | 'clinical_report'
+  | 'evolution'
   | 'calendar_sync'
+  | 'calendar'
   | 'exercise_library';

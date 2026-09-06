@@ -60,20 +60,7 @@ export const VictoriesWallScreen: React.FC = () => {
   const [isAddVictoryModalOpen, setIsAddVictoryModalOpen] = useState(false);
   const [newVictoryTitle, setNewVictoryTitle] = useState('');
   const [newVictoryDesc, setNewVictoryDesc] = useState('');
-  const [customVictories, setCustomVictories] = useState<Array<{ id: string; title: string; desc: string; date: string }>>([
-    {
-      id: 'cust-1',
-      title: 'Subir al 2º piso sin agarrarme del pasamanos',
-      desc: 'Subida firme y sin chasquido en rodillas.',
-      date: 'Esta semana',
-    },
-    {
-      id: 'cust-2',
-      title: 'Levantarme del sillón a la primera',
-      desc: 'Sin balanceo brusco ni apoyo de las manos.',
-      date: 'Hace 3 días',
-    },
-  ]);
+  const [customVictories, setCustomVictories] = useState<Array<{ id: string; title: string; desc: string; date: string }>>([]);
 
   const categories = ['todos', 'Hito Destacado', 'Constancia', 'Bienestar'];
 
@@ -126,12 +113,14 @@ export const VictoriesWallScreen: React.FC = () => {
 
   const renderIcon = (type: string) => {
     switch (type) {
-      case 'Stairs':
-        return <Footprints className="w-5 h-5 text-[#8E4E14]" />;
+      case 'Sparkles':
+        return <Sparkles className="w-5 h-5 text-[#2D6A4F]" />;
       case 'Calendar':
         return <Calendar className="w-5 h-5 text-[#2D6A4F]" />;
       case 'Smile':
         return <Smile className="w-5 h-5 text-[#3A86C8]" />;
+      case 'Stairs':
+        return <Footprints className="w-5 h-5 text-[#8E4E14]" />;
       default:
         return <Trophy className="w-5 h-5 text-[#F4A261]" />;
     }

@@ -1417,50 +1417,49 @@ export const ADVANCED_STRENGTH_EXERCISES: Exercise[] = [
 ];
 
 // ==========================================
-// HITOS Y LOGROS COMPROBABLES (TIPO A & TIPO B)
+// HITOS Y LOGROS DE CONSTANCIA Y BIENESTAR REAL (100% DATOS DEL SISTEMA)
 // ==========================================
 
 export const INITIAL_ACHIEVEMENTS: Achievement[] = [
-  // Tipo A: Verificación por Datos del Sistema
   {
-    id: 'ach-consistencia-hierro',
-    title: 'Consistencia de Hierro',
+    id: 'ach-primera-sesion',
+    title: 'Primera sesión completada',
     category: 'Constancia',
-    timeAgo: 'Meta Mes 1',
-    description: '4 semanas consecutivas cumpliendo todos los días programados en tu calendario.',
-    requirementDescription: 'Cumplir el 100% de los días programados durante 4 semanas consecutivas.',
+    timeAgo: 'Meta de Inicio',
+    description: 'Has dado el paso más importante: completar tu primera sesión de entrenamiento seguro.',
+    requirementDescription: 'Completar 1 sesión real de entrenamiento.',
+    verifiedByProgress: false,
+    badgeIcon: 'Sparkles',
+    unlocked: false,
+    verificationType: 'automatic_data',
+    currentMetricValue: 0,
+    targetMetricValue: 1,
+    metricUnit: 'sesión',
+  },
+  {
+    id: 'ach-semana-perfecta',
+    title: 'Semana perfecta (cumplidos todos los días planificados)',
+    category: 'Constancia',
+    timeAgo: 'Meta Semanal',
+    description: 'Cumpliste el 100% de los días programados en tu calendario durante la semana.',
+    requirementDescription: 'Completar todos los días planificados en una misma semana.',
     verifiedByProgress: false,
     badgeIcon: 'Calendar',
     unlocked: false,
     verificationType: 'automatic_data',
     currentMetricValue: 0,
-    targetMetricValue: 4,
-    metricUnit: 'semanas',
-  },
-  {
-    id: 'ach-sin-rendirse',
-    title: 'Sin Rendirse',
-    category: 'Constancia',
-    timeAgo: 'Meta de Constancia',
-    description: 'Activaste el modo "Día Bajo de Energía" (7 min) en 3 ocasiones en lugar de faltar.',
-    requirementDescription: 'Utilizar el modo "Día Bajo de Energía" 3 veces en lugar de abandonar el entreno.',
-    verifiedByProgress: false,
-    badgeIcon: 'Shield',
-    unlocked: false,
-    verificationType: 'automatic_data',
-    currentMetricValue: 0,
     targetMetricValue: 3,
-    metricUnit: 'veces',
+    metricUnit: 'días',
   },
   {
-    id: 'ach-articulaciones-cuidadas',
-    title: 'Articulaciones Cuidadas',
-    category: 'Bienestar',
-    timeAgo: 'Meta de Salud',
-    description: '10 sesiones consecutivas registrando cero dolor ni sobrecarga articular en el feedback.',
-    requirementDescription: 'Registrar 10 sesiones consecutivas marcando "Sin molestias articulares".',
+    id: 'ach-constancia-bronce',
+    title: 'Constancia de bronce (10 sesiones reales)',
+    category: 'Constancia',
+    timeAgo: 'Hábito Consolidado',
+    description: 'Has acumulado 10 sesiones reales de entrenamiento completadas en la app.',
+    requirementDescription: 'Completar 10 sesiones reales de entrenamiento.',
     verifiedByProgress: false,
-    badgeIcon: 'Smile',
+    badgeIcon: 'Trophy',
     unlocked: false,
     verificationType: 'automatic_data',
     currentMetricValue: 0,
@@ -1468,65 +1467,19 @@ export const INITIAL_ACHIEVEMENTS: Achievement[] = [
     metricUnit: 'sesiones',
   },
   {
-    id: 'ach-plus-energia',
-    title: 'Plus de Energía',
-    category: 'Constancia',
-    timeAgo: 'Meta Voluntaria',
-    description: 'Sesión bonus voluntaria completada (+50 pts de vitalidad y movilidad segura).',
-    requirementDescription: 'Completar una sesión bonus voluntaria de 10-15 min cuando sientas energía extra.',
+    id: 'ach-proteccion-articular',
+    title: 'Protección articular (5 sesiones sin reporte de dolor)',
+    category: 'Bienestar',
+    timeAgo: 'Salud Articular',
+    description: '5 sesiones realizadas sin ningún reporte de dolor o molestia articular.',
+    requirementDescription: 'Completar 5 sesiones registrando "Sin molestias articulares".',
     verifiedByProgress: false,
-    badgeIcon: 'Zap',
+    badgeIcon: 'Smile',
     unlocked: false,
     verificationType: 'automatic_data',
     currentMetricValue: 0,
-    targetMetricValue: 1,
-    metricUnit: 'sesión',
-  },
-
-  // Tipo B: Verificación por Pregunta / Test Funcional
-  {
-    id: 'ach-escaleras-funcional',
-    title: 'Subí 2 pisos sin parar',
-    category: 'Hito Destacado',
-    timeAgo: 'Hito Mes 1',
-    description: 'Superaste 2 pisos de escaleras seguidos con ritmo continuo y respiración controlada.',
-    requirementDescription: 'Test de vida real: Subir 2 pisos seguidos sin detenerse a descansar.',
-    verifiedByProgress: false,
-    badgeIcon: 'Stairs',
-    unlocked: false,
-    verificationType: 'functional_test',
-    functionalQuestion: {
-      id: 'q-escaleras',
-      achievementId: 'ach-escaleras-funcional',
-      milestoneLabel: 'Hito Mes 1 • Potencia y Cardio Suave',
-      questionText: '¿Pudiste subir hoy 2 pisos de escaleras seguidos sin pararte a descansar?',
-      yesLabel: 'Sí, lo logré sin parar',
-      noLabel: 'Aún me cuesta',
-      explanation:
-        'Evalúa la potencia funcional de tus cuádriceps y la adaptación cardiopulmonar en tu entorno cotidiano.',
-    },
-  },
-  {
-    id: 'ach-cordones-funcional',
-    title: 'Atarse los cordones sin dolor',
-    category: 'Bienestar',
-    timeAgo: 'Hito Mes 3',
-    description: 'Flexión de cadera y tronco para alcanzar los pies con la espalda lumbar libre de dolor.',
-    requirementDescription: 'Test de vida real: Agacharse a atarse los cordones con cero dolor de espalda.',
-    verifiedByProgress: false,
-    badgeIcon: 'Trophy',
-    unlocked: false,
-    verificationType: 'functional_test',
-    functionalQuestion: {
-      id: 'q-cordones',
-      achievementId: 'ach-cordones-funcional',
-      milestoneLabel: 'Hito Mes 3 • Flexibilidad Lumbar y Autonomía',
-      questionText: '¿Puedes agacharte a atarte los cordones sin dolor de espalda?',
-      yesLabel: 'Sí, sin dolor',
-      noLabel: 'Todavía con molestia',
-      explanation:
-        'Comprueba la descompresión lumbar y la elasticidad de los isquiotibiales en movimientos cotidianos.',
-    },
+    targetMetricValue: 5,
+    metricUnit: 'sesiones',
   },
 ];
 
@@ -1988,14 +1941,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [lowEnergySessionsCount, setLowEnergySessionsCount] = useState<number>(0);
   const [painFreeSessionsCount, setPainFreeSessionsCount] = useState<number>(0);
 
-  // Completed Workouts List (Clean state based 100% on real user sessions)
+  // Completed Workouts List (Strict zero-data initial state, 100% real user sessions)
   const [completedWorkouts, setCompletedWorkouts] = useState<CompletedWorkout[]>(() => {
     try {
       const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_completed_workouts`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter((w) => w && w.id !== 'w-seed-01');
+          return parsed.filter(
+            (w) =>
+              w &&
+              w.id &&
+              !w.id.toLowerCase().includes('seed') &&
+              !w.id.toLowerCase().includes('mock')
+          );
         }
       }
     } catch {
@@ -2100,23 +2059,108 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [roadStages] = useState<RoadStageNode[]>(INITIAL_ROAD_STAGES);
   const [currentWorld, setCurrentWorld] = useState<1 | 2 | 3 | 4>(1);
 
-  // Achievements (Locked in Zero-Data State)
-  const [achievements, setAchievements] = useState<Achievement[]>(() => {
-    try {
-      const saved = localStorage.getItem(`${LOCAL_STORAGE_KEY}_achievements`);
-      if (saved) {
-        const parsed: Achievement[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return INITIAL_ACHIEVEMENTS;
-  });
+  // Achievements (100% real metrics from completedWorkouts)
+  const [achievements, setAchievements] = useState<Achievement[]>(INITIAL_ACHIEVEMENTS);
   const [shareModalAchievement, setShareModalAchievement] =
     useState<Achievement | null>(null);
+
+  // Sync achievements automatically whenever completedWorkouts or annualPlan changes
+  useEffect(() => {
+    const totalCount = completedWorkouts.length;
+    const painFreeCount = completedWorkouts.filter(
+      (w) =>
+        !w.discomforts ||
+        w.discomforts.length === 0 ||
+        (w.discomforts.length === 1 && w.discomforts[0] === 'ninguna')
+    ).length;
+
+    // Calculate sessions completed this week
+    const now = new Date();
+    const currentDay = now.getDay();
+    const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0);
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const sessionsThisWeek = completedWorkouts.filter((w) => {
+      const d = new Date(w.timestamp);
+      return d >= monday && d <= sunday;
+    }).length;
+
+    const targetWeekDays = annualPlan.daysPerWeek || 3;
+
+    setAchievements([
+      {
+        id: 'ach-primera-sesion',
+        title: 'Primera sesión completada',
+        category: 'Constancia',
+        timeAgo: totalCount >= 1 ? '¡Conseguido!' : 'Meta de Inicio',
+        description:
+          'Has dado el paso más importante: completar tu primera sesión de entrenamiento seguro.',
+        requirementDescription: 'Completar 1 sesión real de entrenamiento.',
+        verifiedByProgress: totalCount >= 1,
+        badgeIcon: 'Sparkles',
+        unlocked: totalCount >= 1,
+        verificationType: 'automatic_data',
+        currentMetricValue: Math.min(1, totalCount),
+        targetMetricValue: 1,
+        metricUnit: 'sesión',
+      },
+      {
+        id: 'ach-semana-perfecta',
+        title: 'Semana perfecta (cumplidos todos los días planificados)',
+        category: 'Constancia',
+        timeAgo: sessionsThisWeek >= targetWeekDays ? '¡Conseguido!' : 'Meta Semanal',
+        description:
+          'Cumpliste el 100% de los días programados en tu calendario durante la semana.',
+        requirementDescription: `Completar todos los días planificados (${targetWeekDays} días) en una misma semana.`,
+        verifiedByProgress: sessionsThisWeek >= targetWeekDays,
+        badgeIcon: 'Calendar',
+        unlocked: sessionsThisWeek >= targetWeekDays,
+        verificationType: 'automatic_data',
+        currentMetricValue: Math.min(targetWeekDays, sessionsThisWeek),
+        targetMetricValue: targetWeekDays,
+        metricUnit: 'días',
+      },
+      {
+        id: 'ach-constancia-bronce',
+        title: 'Constancia de bronce (10 sesiones reales)',
+        category: 'Constancia',
+        timeAgo: totalCount >= 10 ? '¡Conseguido!' : 'Hábito Consolidado',
+        description:
+          'Has acumulado 10 sesiones reales de entrenamiento completadas en la app.',
+        requirementDescription: 'Completar 10 sesiones reales de entrenamiento.',
+        verifiedByProgress: totalCount >= 10,
+        badgeIcon: 'Trophy',
+        unlocked: totalCount >= 10,
+        verificationType: 'automatic_data',
+        currentMetricValue: Math.min(10, totalCount),
+        targetMetricValue: 10,
+        metricUnit: 'sesiones',
+      },
+      {
+        id: 'ach-proteccion-articular',
+        title: 'Protección articular (5 sesiones sin reporte de dolor)',
+        category: 'Bienestar',
+        timeAgo: painFreeCount >= 5 ? '¡Conseguido!' : 'Salud Articular',
+        description:
+          '5 sesiones realizadas sin ningún reporte de dolor o molestia articular.',
+        requirementDescription:
+          'Completar 5 sesiones registrando "Sin molestias articulares".',
+        verifiedByProgress: painFreeCount >= 5,
+        badgeIcon: 'Smile',
+        unlocked: painFreeCount >= 5,
+        verificationType: 'automatic_data',
+        currentMetricValue: Math.min(5, painFreeCount),
+        targetMetricValue: 5,
+        metricUnit: 'sesiones',
+      },
+    ]);
+  }, [completedWorkouts, annualPlan.daysPerWeek]);
 
   // Clinical Metrics (100% real, populated upon submitting real check-ins)
   const [clinicalMetrics, setClinicalMetrics] = useState<ClinicalWeeklyMetric[]>(() => {
