@@ -70,11 +70,34 @@ export interface AnthropometricRecord {
   weightKg: number;
   bmi: number;
   bmiCategory: 'bajo_peso' | 'normopeso' | 'sobrepeso' | 'obesidad';
+  shouldersCm?: number; // Contorno de Hombros
+  chestCm?: number; // Contorno de Pecho / Torso
   waistCm?: number; // Contorno de Cintura
   hipCm?: number; // Contorno de Cadera
   thighCm?: number; // Contorno de Muslo
   armCm?: number; // Contorno de Brazo
   notes?: string;
+}
+
+export type BodyRecompositionGoal =
+  | 'recomposicion'
+  | 'perdida_grasa'
+  | 'ganancia_muscular'
+  | 'salud_articular';
+
+export type BodyFocusZone =
+  | 'hombros'
+  | 'pecho'
+  | 'brazos'
+  | 'cintura'
+  | 'gluteos'
+  | 'piernas';
+
+export interface BodyGoals {
+  primaryGoal: BodyRecompositionGoal;
+  targetWeightKg?: number;
+  targetWaistCm?: number;
+  focusZones: BodyFocusZone[];
 }
 
 export type BiologicalSex = 'Mujer' | 'Hombre';
@@ -118,6 +141,7 @@ export interface UserProfile {
   onboardingStep: number; // 0: Bienvenida y Perfil, 1: Limitaciones Clínicas, 2: Macrociclo 12 Meses
   createdAt: string;
   trackingPreferences?: TrackingPreferences;
+  bodyGoals?: BodyGoals;
 }
 
 // ==========================================

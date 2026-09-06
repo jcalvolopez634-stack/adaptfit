@@ -49,8 +49,22 @@ import {
   HealthCondition,
   EquipmentAvailableChoice,
   DumbbellType,
+  BodyGoals,
+  BodyRecompositionGoal,
+  BodyFocusZone,
 } from '../types';
-import { calculateBMI } from '../utils/anthropometry';
+import {
+  calculateBMI,
+  calculateBodyCompositionAdvice,
+  BodyCompositionAdvice,
+  calculateBodyRecompositionAnalysis,
+  RecompositionAnalysis,
+  PerimeterComparison,
+  FocusZoneRecommendation,
+  calculateBodyRecompositionMetrics,
+  BodyRecompositionMetrics,
+  ClinicalPerimeterRow,
+} from '../utils/anthropometry';
 import { EXERCISES_DATABASE, findSafeAlternativesForExercise, SafeAlternativeOption } from '../data/exercisesData';
 
 export const DEFAULT_TRACKING_PREFERENCES: TrackingPreferences = {
@@ -1659,11 +1673,38 @@ export interface AppContextType {
   exportCalendarICS: () => void;
   downloadClinicalReportPDF: () => void;
 
-  // Anthropometric & Body Composition
+  // Anthropometric & Body Composition & Recomposition
   anthropometricRecords: AnthropometricRecord[];
-  addAnthropometricRecord: (record: Omit<AnthropometricRecord, 'id'>) => void;
+  addAnthropometricRecord: (record: {
+    weightKg: number;
+    heightCm?: number;
+    shouldersCm?: number;
+    chestCm?: number;
+    waistCm?: number;
+    hipCm?: number;
+    thighCm?: number;
+    armCm?: number;
+    notes?: string;
+    date?: string;
+    bmi?: number;
+    bmiCategory?: 'bajo_peso' | 'normopeso' | 'sobrepeso' | 'obesidad';
+  }) => AnthropometricRecord;
   deleteAnthropometricRecord: (id: string) => void;
   updateHeightAndWeight: (heightCm: number, weightKg: number) => void;
+  updateBodyGoals: (goals: Partial<BodyGoals>) => void;
+  calculateBodyCompositionAdvice: (
+    weightKg?: number,
+    heightCm?: number,
+    sex?: BiologicalSex,
+    discomfortZones?: JointDiscomfortZone[],
+    waistCm?: number,
+    hipCm?: number
+  ) => BodyCompositionAdvice;
+  bodyCompositionAdvice: BodyCompositionAdvice;
+  recompositionAnalysis: RecompositionAnalysis;
+  getBodyRecompositionAnalysis: () => RecompositionAnalysis;
+  calculateBodyRecompositionMetrics: (records?: AnthropometricRecord[]) => BodyRecompositionMetrics;
+  bodyRecompositionMetrics: BodyRecompositionMetrics;
 }
 
 // ==========================================
@@ -1789,6 +1830,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             onboardingStep: typeof parsed.onboardingStep === 'number' ? parsed.onboardingStep : 0,
             createdAt: parsed.createdAt || new Date().toISOString(),
             trackingPreferences: parsed.trackingPreferences || DEFAULT_TRACKING_PREFERENCES,
+            bodyGoals: parsed.bodyGoals || {
+              primaryGoal: 'recomposicion',
+              targetWeightKg: undefined,
+              targetWaistCm: undefined,
+              focusZones: ['cintura', 'hombros', 'gluteos'],
+            },
           };
         }
       }
@@ -1814,6 +1861,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       onboardingStep: 0,
       createdAt: new Date().toISOString(),
       trackingPreferences: DEFAULT_TRACKING_PREFERENCES,
+      bodyGoals: {
+        primaryGoal: 'recomposicion',
+        targetWeightKg: undefined,
+        targetWaistCm: undefined,
+        focusZones: ['cintura', 'hombros', 'gluteos'],
+      },
     };
   });
 
@@ -2524,19 +2577,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const addAnthropometricRecord = useCallback(
-    (record: Omit<AnthropometricRecord, 'id'>) => {
+    (record: {
+      weightKg: number;
+      heightCm?: number;
+      shouldersCm?: number;
+      chestCm?: number;
+      waistCm?: number;
+      hipCm?: number;
+      thighCm?: number;
+      armCm?: number;
+      notes?: string;
+      date?: string;
+      bmi?: number;
+      bmiCategory?: 'bajo_peso' | 'normopeso' | 'sobrepeso' | 'obesidad';
+    }) => {
+      const height =
+        record.heightCm && record.heightCm > 0
+          ? record.heightCm
+          : userProfile.heightCm || 165;
+      const weight = record.weightKg;
+
+      const assessment = calculateBMI(weight, height);
+
       const newRecord: AnthropometricRecord = {
-        ...record,
         id: `anthro-${Date.now()}`,
+        date: record.date || new Date().toISOString(),
+        heightCm: height,
+        weightKg: weight,
+        bmi: record.bmi !== undefined ? record.bmi : assessment.bmi,
+        bmiCategory: record.bmiCategory || assessment.category,
+        shouldersCm: record.shouldersCm,
+        chestCm: record.chestCm,
+        waistCm: record.waistCm,
+        hipCm: record.hipCm,
+        thighCm: record.thighCm,
+        armCm: record.armCm,
+        notes: record.notes,
       };
+
       setAnthropometricRecords((prev) => [newRecord, ...prev]);
       setUserProfile((prev) => ({
         ...prev,
-        heightCm: record.heightCm,
-        weightKg: record.weightKg,
+        heightCm: height,
+        weightKg: weight,
       }));
+
+      return newRecord;
     },
-    []
+    [userProfile.heightCm]
   );
 
   const deleteAnthropometricRecord = useCallback((id: string) => {
@@ -2561,6 +2649,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     };
     setAnthropometricRecords((prev) => [newRecord, ...prev]);
   }, []);
+
+  const updateBodyGoals = useCallback((goals: Partial<BodyGoals>) => {
+    setUserProfile((prev) => {
+      const currentGoals: BodyGoals = prev.bodyGoals || {
+        primaryGoal: 'recomposicion',
+        targetWeightKg: undefined,
+        targetWaistCm: undefined,
+        focusZones: ['cintura', 'hombros', 'gluteos'],
+      };
+      return {
+        ...prev,
+        bodyGoals: {
+          ...currentGoals,
+          ...goals,
+        },
+      };
+    });
+  }, []);
+
+  const getBodyRecompositionAnalysis = useCallback((): RecompositionAnalysis => {
+    return calculateBodyRecompositionAnalysis({
+      records: anthropometricRecords,
+      bodyGoals: userProfile.bodyGoals,
+      discomfortZones: userProfile.discomfortZones,
+    });
+  }, [anthropometricRecords, userProfile.bodyGoals, userProfile.discomfortZones]);
+
+  const recompositionAnalysis = useMemo(() => {
+    return getBodyRecompositionAnalysis();
+  }, [getBodyRecompositionAnalysis]);
+
+  const calculateBodyRecompositionMetricsCallback = useCallback(
+    (records?: AnthropometricRecord[]): BodyRecompositionMetrics => {
+      const recordsToUse = records || anthropometricRecords;
+      return calculateBodyRecompositionMetrics(
+        recordsToUse,
+        userProfile.bodyGoals,
+        userProfile.biologicalSex || 'Mujer'
+      );
+    },
+    [anthropometricRecords, userProfile.bodyGoals, userProfile.biologicalSex]
+  );
+
+  const bodyRecompositionMetrics = useMemo(() => {
+    return calculateBodyRecompositionMetricsCallback();
+  }, [calculateBodyRecompositionMetricsCallback]);
+
+  const getBodyCompositionAdvice = useCallback(
+    (
+      weightKg?: number,
+      heightCm?: number,
+      sex?: BiologicalSex,
+      discomfortZones?: JointDiscomfortZone[],
+      waistCm?: number,
+      hipCm?: number
+    ): BodyCompositionAdvice => {
+      const latest = anthropometricRecords[0];
+      const targetWeight = weightKg || latest?.weightKg || userProfile.weightKg || 70;
+      const targetHeight = heightCm || latest?.heightCm || userProfile.heightCm || 165;
+      const targetSex = sex || userProfile.biologicalSex || 'Mujer';
+      const targetDiscomforts = discomfortZones || userProfile.discomfortZones || [];
+      const targetWaist = waistCm !== undefined ? waistCm : latest?.waistCm;
+      const targetHip = hipCm !== undefined ? hipCm : latest?.hipCm;
+
+      return calculateBodyCompositionAdvice({
+        weightKg: targetWeight,
+        heightCm: targetHeight,
+        sex: targetSex,
+        discomfortZones: targetDiscomforts,
+        waistCm: targetWaist,
+        hipCm: targetHip,
+      });
+    },
+    [anthropometricRecords, userProfile]
+  );
+
+  const bodyCompositionAdvice = useMemo(() => {
+    return getBodyCompositionAdvice();
+  }, [getBodyCompositionAdvice]);
 
   const toggleDiscomfortZone = useCallback((zone: JointDiscomfortZone) => {
     setUserProfile((prev) => {
@@ -4055,12 +4222,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     window.URL.revokeObjectURL(url);
   }, [annualPlan.selectedDays, annualPlan.minutesPerSession]);
 
-  // Clinical Report PDF / Printable Document Generator with Real Live Metrics
+  // Documento de Registro de Actividad y Evolución Física (Seguimiento del usuario para consulta médica/fisioterapia)
   const downloadClinicalReportPDF = useCallback(() => {
     const totalSessions = completedWorkouts.length;
     const allIncidents = completedWorkouts.flatMap((w) => w.safetyIncidents || []);
+    const totalMinutes = completedWorkouts.reduce(
+      (acc, w) => acc + (w.durationMinutes || 0),
+      0
+    );
 
-    // RPE numérico mapeado en vivo desde completedWorkouts
+    // RPE numérico mapeado desde completedWorkouts (Escala de Borg)
     const rpeMap: Record<string, number> = {
       muy_suave: 2,
       suave: 4,
@@ -4077,24 +4248,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         ? (rpeScores.reduce((acc, curr) => acc + curr, 0) / rpeScores.length).toFixed(1)
         : '0.0';
 
-    // Sesiones sin dolor articular
+    // Sesiones sin molestias reportadas
     const painFreeSessions = completedWorkouts.filter(
       (w) => !w.discomforts || w.discomforts.length === 0 || w.discomforts.includes('ninguna')
     ).length;
     const painFreeRate =
       totalSessions > 0 ? Math.round((painFreeSessions / totalSessions) * 100) : 100;
 
-    // Zonas articulares protegidas calculadas en vivo
+    // Zonas de molestia declaradas por el usuario
     const rawProtectedZones =
-      userProfile.discomfortZones && userProfile.discomfortZones.length > 0 && !userProfile.discomfortZones.includes('ninguna')
+      userProfile.discomfortZones &&
+      userProfile.discomfortZones.length > 0 &&
+      !userProfile.discomfortZones.includes('ninguna')
         ? userProfile.discomfortZones
-        : (userProfile.healthConditions || []).filter((c) => c !== 'Ninguna molestia' && c !== 'Problemas de equilibrio');
+        : (userProfile.healthConditions || []).filter(
+            (c) => c !== 'Ninguna molestia' && c !== 'Problemas de equilibrio'
+          );
     const protectedJointZones =
       rawProtectedZones.length > 0
         ? rawProtectedZones.map((z) => z.replace(/_/g, ' ')).join(', ')
-        : 'Todas las articulaciones bajo protocolo de impacto ZERO';
+        : 'Ninguna zona con molestia previa indicada';
 
-    // Conteo real de intervenciones de seguridad
+    // Incidencias de sustitución y adaptación por molestia
     const substitutedIncidents = allIncidents.filter(
       (i) => i.action === 'sustituido_por_alternativa'
     );
@@ -4102,66 +4277,324 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       (i) => i.action === 'descartado_seguridad'
     );
 
+    // Métricas Antropométricas
+    const recompMetrics = calculateBodyRecompositionMetrics(
+      anthropometricRecords,
+      userProfile.bodyGoals,
+      userProfile.biologicalSex || 'Mujer'
+    );
+
+    const latestRecord = recompMetrics.latestRecord || anthropometricRecords[0];
+    const initialRecord = recompMetrics.firstRecord || anthropometricRecords[anthropometricRecords.length - 1];
+
     const currentDateStr = new Date().toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
 
+    const initialDateStr = initialRecord?.date
+      ? new Date(initialRecord.date).toLocaleDateString('es-ES')
+      : 'Inicial';
+    const latestDateStr = latestRecord?.date
+      ? new Date(latestRecord.date).toLocaleDateString('es-ES')
+      : 'Actual';
+
+    const goalLabelMap: Record<string, string> = {
+      recomposicion: 'Recomposición corporal (reducir grasa y mantener tono muscular)',
+      ganancia_muscular: 'Ganancia y tonificación muscular',
+      perdida_grasa: 'Reducción de porcentaje graso',
+      salud_articular: 'Salud y protección articular (impacto cero)',
+    };
+
+    const userGoalLabel = userProfile.bodyGoals?.primaryGoal
+      ? goalLabelMap[userProfile.bodyGoals.primaryGoal] || userProfile.bodyGoals.primaryGoal
+      : 'Salud general y bienestar físico';
+
     const reportHtml = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Informe Clínico de Prescripción y Evolución Funcional - AdaptFit</title>
+  <title>AdaptFit — Registro de Actividad y Evolución Física (Seguimiento del usuario)</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #191c1d; padding: 36px; max-width: 860px; margin: 0 auto; background: #fff; }
-    h1 { color: #2d6a4f; margin-bottom: 4px; font-size: 24px; font-weight: 800; }
-    h2 { color: #191c1d; font-size: 16px; border-bottom: 2px solid #e7f3ec; padding-bottom: 6px; margin-top: 26px; }
-    .header-pill { display: inline-block; padding: 5px 14px; background: #e7f3ec; color: #0f5238; border-radius: 12px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px; }
-    .meta-box { background: #f8f9fa; border: 1px solid #e1e3e4; border-radius: 12px; padding: 18px; margin-bottom: 20px; }
-    .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 13px; }
-    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
-    th { background: #2d6a4f; color: white; text-align: left; padding: 8px 12px; font-weight: 600; font-size: 12px; text-transform: uppercase; }
-    td { border-bottom: 1px solid #edeeef; padding: 9px 12px; vertical-align: middle; }
-    tr:nth-child(even) td { background-color: #fafbfb; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; background: #e7f3ec; color: #0f5238; }
-    .disclaimer { font-size: 11px; color: #707973; margin-top: 30px; border-top: 1px solid #e1e3e4; padding-top: 14px; }
-    @media print { body { padding: 0; } .no-print { display: none; } }
+    @page { size: A4 portrait; margin: 12mm 15mm; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #191c1d;
+      line-height: 1.45;
+      font-size: 11px;
+      background: #ffffff;
+      padding: 24px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    @media print {
+      body { padding: 0; }
+      .no-print { display: none; }
+    }
+    .header {
+      border-bottom: 2px solid #0f5238;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    .header-subtag {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #0f5238;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f5238;
+      margin: 0;
+      letter-spacing: -0.3px;
+    }
+    .subtitle {
+      font-size: 10px;
+      color: #4a5568;
+      margin-top: 3px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #0f5238;
+      border-bottom: 1.5px solid #d9dedb;
+      padding-bottom: 4px;
+      margin-top: 18px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .meta-box {
+      background: #f8fbf9;
+      border: 1px solid #d9dedb;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      font-size: 11px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px 12px;
+    }
+    .kpi-container {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      background: #f8fbf9;
+      border: 1px solid #d9dedb;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+    .kpi-label {
+      font-size: 9.5px;
+      color: #555e59;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .kpi-value {
+      font-size: 17px;
+      font-weight: 800;
+      color: #0f5238;
+      margin-top: 2px;
+    }
+    .kpi-sub {
+      font-size: 9px;
+      color: #707973;
+      margin-top: 2px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 10.5px;
+    }
+    th {
+      background: #f0f5f2;
+      color: #0f5238;
+      text-align: left;
+      padding: 6px 10px;
+      font-weight: 700;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      border-top: 1px solid #d9dedb;
+      border-bottom: 1.5px solid #0f5238;
+    }
+    td {
+      border-bottom: 1px solid #eef1ef;
+      padding: 6px 10px;
+      vertical-align: middle;
+    }
+    tr:nth-child(even) td {
+      background-color: #fafcfb;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 9.5px;
+      font-weight: 700;
+    }
+    .badge-green { background: #e7f3ec; color: #0f5238; }
+    .badge-blue { background: #ebf3fa; color: #1d6fa5; }
+    .badge-amber { background: #fff6ed; color: #8e4e14; }
+    .note-box {
+      background: #f8fbf9;
+      border-left: 3.5px solid #0f5238;
+      border-top: 1px solid #e1e6e3;
+      border-right: 1px solid #e1e6e3;
+      border-bottom: 1px solid #e1e6e3;
+      padding: 10px 14px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 14px;
+      font-size: 10.5px;
+    }
+    .consultation-notes {
+      border: 1px dashed #b5c2ba;
+      background: #fafcfb;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-top: 18px;
+      min-height: 85px;
+    }
+    .disclaimer {
+      font-size: 9.5px;
+      color: #555e59;
+      margin-top: 20px;
+      border-top: 1px solid #d9dedb;
+      padding-top: 10px;
+      line-height: 1.45;
+      text-align: justify;
+    }
   </style>
 </head>
 <body>
-  <h1>Informe Clínico de Prescripción y Evolución Funcional</h1>
-  <div class="header-pill">ADAPTFIT CLINICAL SUITE • FECHA DE EMISIÓN: ${currentDateStr}</div>
-  
-  <div class="meta-box">
-    <div class="meta-grid">
-      <div><strong>Paciente / Usuario:</strong> ${userProfile.name || 'Paciente'}</div>
-      <div><strong>Sexo Biológico:</strong> ${userProfile.biologicalSex || 'Mujer'}</div>
-      <div><strong>Nivel de Condición Física:</strong> ${userProfile.fitnessLevel || 'Iniciación / Recuperación'}</div>
-      <div><strong>Zonas Articulares Protegidas:</strong> ${protectedJointZones}</div>
-      <div><strong>Equipamiento Habilitado:</strong> ${(userProfile.availableEquipment || []).join(', ') || userProfile.equipmentAvailable || 'Peso corporal'}</div>
-      <div><strong>Sesiones Completadas:</strong> ${totalSessions}</div>
-      <div><strong>RPE Medio Registrado:</strong> ${totalSessions > 0 ? `${meanRPE} / 10` : 'Sin sesiones'}</div>
-      <div><strong>Tasa Libre de Dolor:</strong> ${painFreeRate}%</div>
+
+  <!-- ENCABEZADO -->
+  <div class="header">
+    <div>
+      <div class="header-subtag">Informe Informativo de Actividad y Estado Físico</div>
+      <h1 class="title">AdaptFit — Registro de Actividad y Evolución Física (Seguimiento del usuario)</h1>
+      <div class="subtitle">Documento de apoyo para consulta con médico, fisioterapeuta o preparador físico</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:10px;color:#555e59;">Fecha de emisión: <strong>${currentDateStr}</strong></div>
+      <div style="font-size:9.5px;color:#707973;margin-top:2px;">Aplicación: <strong>AdaptFit v2.0</strong></div>
     </div>
   </div>
 
-  <h2>1. Auditoría de Seguridad Articular y Paradas Preventivas</h2>
+  <!-- DATOS GENERALES DEL USUARIO -->
+  <div class="meta-box">
+    <div class="meta-grid">
+      <div><strong>Usuario/a:</strong> ${userProfile.name || 'No especificado'}</div>
+      <div><strong>Sexo biológico:</strong> ${userProfile.biologicalSex || 'No especificado'}</div>
+      <div><strong>Altura actual:</strong> ${latestRecord?.heightCm || userProfile.heightCm || 165} cm</div>
+      <div><strong>Peso más reciente:</strong> ${latestRecord?.weightKg || userProfile.weightKg || 70} kg</div>
+      <div><strong>Nivel de partida:</strong> ${userProfile.fitnessLevel || 'Iniciación / Recuperación'}</div>
+      <div><strong>Equipamiento habitual:</strong> ${(userProfile.availableEquipment || []).join(', ') || userProfile.equipmentAvailable || 'Peso corporal'}</div>
+      <div style="grid-column: span 2;"><strong>Molestias previas declaradas:</strong> ${protectedJointZones}</div>
+      <div><strong>Objetivo seleccionado:</strong> ${userGoalLabel}</div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 1: RESUMEN DE ADHERENCIA Y TOLERANCIA AL ESFUERZO -->
+  <div class="section-title">1. Resumen de Adherencia y Esfuerzo Percibido</div>
+  <div class="kpi-container">
+    <div>
+      <div class="kpi-label">Sesiones Registradas</div>
+      <div class="kpi-value">${totalSessions}</div>
+      <div class="kpi-sub">entrenamientos completados</div>
+    </div>
+    <div>
+      <div class="kpi-label">Minutos Activos</div>
+      <div class="kpi-value">${totalMinutes} min</div>
+      <div class="kpi-sub">volumen total acumulado</div>
+    </div>
+    <div>
+      <div class="kpi-label">RPE Medio (Borg)</div>
+      <div class="kpi-value">${totalSessions > 0 ? `${meanRPE} / 10` : 'Sin datos'}</div>
+      <div class="kpi-sub">esfuerzo percibido medio</div>
+    </div>
+    <div>
+      <div class="kpi-label">Sesiones sin Molestias</div>
+      <div class="kpi-value">${painFreeRate}%</div>
+      <div class="kpi-sub">${painFreeSessions} de ${totalSessions} sesiones</div>
+    </div>
+  </div>
+
+  <div class="note-box">
+    <strong>Nota sobre el esfuerzo percibido (Escala de Borg 1-10):</strong> ${
+      totalSessions > 0
+        ? parseFloat(meanRPE) <= 4.0
+          ? `El usuario ha registrado un promedio de esfuerzo suave (${meanRPE} / 10), enfocado en control postural y acondicionamiento inicial sin fatiga neuromuscular excesiva.`
+          : parseFloat(meanRPE) <= 6.5
+          ? `El usuario ha registrado un promedio de esfuerzo moderado (${meanRPE} / 10), correspondiente a estímulos activos de fuerza y movilidad sostenibles sin reporte de sobreesfuerzo agudo.`
+          : `El usuario ha registrado un esfuerzo medio exigente (${meanRPE} / 10). Conviene revisar los tiempos de recuperación o el volumen de repeticiones en consulta.`
+        : 'No hay sesiones registradas suficientes para determinar la media de esfuerzo.'
+    }
+  </div>
+
+  <!-- SECCIÓN 2: TABLA COMPARATIVA DE ANTROPOMETRÍA -->
+  <div class="section-title">2. Tabla Comparativa de Antropometría y Medidas Corporales</div>
+  <p style="font-size:10px;color:#555e59;margin:2px 0 8px 0;">
+    Comparativa entre la medición inicial registrada (${initialDateStr}) y la medición más reciente (${latestDateStr}). Datos introducidos directamente por el usuario.
+  </p>
+
   <table>
     <thead>
       <tr>
-        <th>Intervenciones Totales</th>
-        <th>Variantes Suaves</th>
-        <th>Retirados por Seguridad</th>
-        <th>Impacto en Adherencia</th>
+        <th style="width:28%;">Medida / Parámetro</th>
+        <th style="width:16%;">Registro Inicial</th>
+        <th style="width:16%;">Registro Actual</th>
+        <th style="width:16%;">Variación (Δ)</th>
+        <th style="width:24%;">Referencia Informativa</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${recompMetrics.comparisonTable
+        .map(
+          (row) => `<tr>
+        <td><strong>${row.parameter}</strong></td>
+        <td>${row.initial}</td>
+        <td><strong>${row.current}</strong></td>
+        <td><span class="badge ${row.isFavorable ? 'badge-green' : 'badge-amber'}">${row.delta}</span></td>
+        <td style="font-size:9.5px;color:#4a5568;">${row.clinicalCriterion}</td>
+      </tr>`
+        )
+        .join('')}
+    </tbody>
+  </table>
+
+  <!-- SECCIÓN 3: INCIDENCIAS ARTICULARES Y ADAPTACIONES REALIZADAS -->
+  <div class="section-title">3. Registro de Incidencias Articulares y Adaptaciones de Ejercicio</div>
+  <p style="font-size:10px;color:#555e59;margin:2px 0 8px 0;">
+    Registro de las ocasiones en las que el usuario utilizó la opción de adaptación durante el entrenamiento ante una molestia articular, sustituyendo o retirando el ejercicio programado.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:25%;">Resumen de Adaptaciones</th>
+        <th style="width:25%;">Sustituciones por Menor Impacto</th>
+        <th style="width:25%;">Ejercicios Omitidos por Molestia</th>
+        <th style="width:25%;">Continuidad de la Sesión</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td><strong>${allIncidents.length}</strong></td>
-        <td>${substitutedIncidents.length}</td>
-        <td>${discardedIncidents.length}</td>
-        <td><span class="badge">0 Penalización (100% Seguro)</span></td>
+        <td><strong>${allIncidents.length}</strong> adaptaciones registradas</td>
+        <td>${substitutedIncidents.length} variantes suaves utilizadas</td>
+        <td>${discardedIncidents.length} ejercicios omitidos</td>
+        <td><span class="badge badge-green">Sesiones continuadas con adaptación</span></td>
       </tr>
     </tbody>
   </table>
@@ -4171,62 +4604,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       ? `<table>
     <thead>
       <tr>
-        <th>Fecha</th>
-        <th>Ejercicio</th>
-        <th>Acción</th>
-        <th>Resolución / Detalle</th>
+        <th style="width:14%;">Fecha</th>
+        <th style="width:28%;">Ejercicio Programado</th>
+        <th style="width:22%;">Acción Realizada</th>
+        <th style="width:36%;">Detalle / Alternativa Ejecutada</th>
       </tr>
     </thead>
     <tbody>
       ${allIncidents
+        .slice(0, 10)
         .map(
           (inc) => `<tr>
         <td>${new Date(inc.timestamp).toLocaleDateString('es-ES')}</td>
         <td><strong>${inc.exerciseTitle}</strong></td>
-        <td><span class="badge">${inc.action === 'sustituido_por_alternativa' ? 'Sustituido por variante suave' : 'Retirado'}</span></td>
-        <td>${inc.replacementExerciseTitle ? `Alternativa: ${inc.replacementExerciseTitle}. ` : ''}${inc.clinicalNote || inc.reason || ''}</td>
+        <td><span class="badge ${inc.action === 'sustituido_por_alternativa' ? 'badge-blue' : 'badge-amber'}">${
+            inc.action === 'sustituido_por_alternativa' ? 'Sustituido por variante suave' : 'Omitido por precaución'
+          }</span></td>
+        <td style="font-size:9.5px;color:#4a5568;">${
+          inc.replacementExerciseTitle ? `<strong>Alternativa:</strong> ${inc.replacementExerciseTitle}. ` : ''
+        }${inc.reason || inc.clinicalNote || 'Adaptación para evitar sobrecarga o molestia focal.'}</td>
       </tr>`
         )
         .join('')}
     </tbody>
   </table>`
-      : '<p style="font-size:12px;color:#707973;font-style:italic;">No se han producido incidencias articulares ni molestias lesivas durante las sesiones realizadas.</p>'
+      : '<div class="note-box" style="color:#0f5238;"><strong>Sin incidencias registradas:</strong> No se han registrado molestias articulares agudas ni adaptaciones de urgencia durante los entrenamientos completados en la aplicación.</div>'
   }
 
-  <h2>2. Historial de Sesiones Registradas</h2>
+  <!-- SECCIÓN 4: HISTORIAL RECIENTE DE SESIONES -->
   ${
     totalSessions > 0
-      ? `<table>
+      ? `<div class="section-title">4. Historial Reciente de Entrenamientos</div>
+  <table>
     <thead>
       <tr>
-        <th>Fecha</th>
-        <th>Rutina</th>
-        <th>Duración</th>
-        <th>RPE Esfuerzo</th>
-        <th>Molestias Reportadas</th>
+        <th style="width:16%;">Fecha</th>
+        <th style="width:34%;">Rutina Realizada</th>
+        <th style="width:16%;">Duración</th>
+        <th style="width:16%;">RPE (Esfuerzo 1-10)</th>
+        <th style="width:18%;">Molestias Notificadas</th>
       </tr>
     </thead>
     <tbody>
       ${completedWorkouts
-        .slice(0, 15)
+        .slice(0, 8)
         .map(
           (w) => `<tr>
         <td>${new Date(w.timestamp).toLocaleDateString('es-ES')}</td>
         <td><strong>${w.routineTitle}</strong></td>
         <td>${w.durationMinutes} min</td>
         <td>${w.rpeScore || rpeMap[w.rpe] || 5} / 10</td>
-        <td>${(w.discomforts || []).filter((d) => d !== 'ninguna').join(', ') || '<span class="badge">Sin molestias</span>'}</td>
+        <td>${
+          (w.discomforts || []).filter((d) => d !== 'ninguna').length === 0
+            ? '<span class="badge badge-green">Sin molestias</span>'
+            : `<span class="badge badge-amber">${w.discomforts.filter((d) => d !== 'ninguna').join(', ')}</span>`
+        }</td>
       </tr>`
         )
         .join('')}
     </tbody>
   </table>`
-      : '<p style="font-size:12px;color:#707973;font-style:italic;">Sin sesiones completadas aún. El programa se encuentra en fase inicial de prescripción.</p>'
+      : ''
   }
 
-  <div class="disclaimer">
-    Informe clínico generado en tiempo real por el motor biomédico de AdaptFit para su entrega a profesionales de la salud, fisioterapeutas o traumatólogos.
+  <!-- ESPACIO DE CONSULTA PARA EL PROFESIONAL -->
+  <div class="consultation-notes">
+    <div style="font-size:10px;font-weight:700;color:#0f5238;text-transform:uppercase;margin-bottom:6px;">
+      Espacio para observaciones del profesional (Médico / Fisioterapeuta / Entrenador):
+    </div>
+    <div style="height:55px;"></div>
   </div>
+
+  <!-- AVISO LEGAL Y DESCARGO DE RESPONSABILIDAD -->
+  <div class="disclaimer">
+    <strong>Aviso legal e informativo:</strong> Este documento es un resumen de autorregistro generado a partir de los datos introducidos voluntariamente por la persona usuaria en la aplicación AdaptFit. Su finalidad es estrictamente informativa para servir de apoyo y contexto durante la consulta con un profesional médico, fisioterapeuta o educador físico. No constituye un diagnóstico médico, prescripción clínica ni sustituye la valoración, supervisión o tratamiento de un profesional de la salud cualificado.
+  </div>
+
 </body>
 </html>`;
 
@@ -4236,13 +4689,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     link.href = url;
     const sanitizedName = userProfile.name
       ? userProfile.name.toLowerCase().replace(/\s+/g, '_')
-      : 'paciente';
-    link.setAttribute('download', `informe_clinico_${sanitizedName}_${new Date().toISOString().slice(0, 10)}.html`);
+      : 'usuario';
+    link.setAttribute(
+      'download',
+      `registro_actividad_${sanitizedName}_${new Date().toISOString().slice(0, 10)}.html`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  }, [userProfile, completedWorkouts]);
+  }, [userProfile, completedWorkouts, anthropometricRecords]);
 
   const value = useMemo(
     () => ({
@@ -4335,6 +4791,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       addAnthropometricRecord,
       deleteAnthropometricRecord,
       updateHeightAndWeight,
+      updateBodyGoals,
+      calculateBodyCompositionAdvice: getBodyCompositionAdvice,
+      bodyCompositionAdvice,
+      recompositionAnalysis,
+      getBodyRecompositionAnalysis,
+      calculateBodyRecompositionMetrics: calculateBodyRecompositionMetricsCallback,
+      bodyRecompositionMetrics,
     }),
     [
       activeTab,
@@ -4426,6 +4889,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       addAnthropometricRecord,
       deleteAnthropometricRecord,
       updateHeightAndWeight,
+      updateBodyGoals,
+      getBodyCompositionAdvice,
+      bodyCompositionAdvice,
+      getBodyRecompositionAnalysis,
+      recompositionAnalysis,
+      calculateBodyRecompositionMetricsCallback,
+      bodyRecompositionMetrics,
     ]
   );
 
