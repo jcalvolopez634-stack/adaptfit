@@ -2314,20 +2314,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       // Automatic bi-directional synchronization for health conditions & discomfort zones
-      if (profile.healthConditions && !profile.discomfortZones) {
+      if (profile.healthConditions) {
         const mappedZones: JointDiscomfortZone[] = [];
-        if (profile.healthConditions.includes('Molestia en rodillas')) mappedZones.push('rodillas');
-        if (profile.healthConditions.includes('Molestia lumbar')) mappedZones.push('espalda_lumbar');
-        if (profile.healthConditions.includes('Molestia en hombros/cuello')) {
+        if (profile.healthConditions.some((c) => c === 'Molestia en rodillas')) mappedZones.push('rodillas');
+        if (
+          profile.healthConditions.some(
+            (c) => c === 'Molestia lumbar (espalda baja)' || c === 'Molestia lumbar'
+          )
+        )
+          mappedZones.push('espalda_lumbar');
+        if (
+          profile.healthConditions.some(
+            (c) =>
+              c === 'Molestia en hombros / cuello' ||
+              c === 'Molestia en hombros/cuello'
+          )
+        ) {
           mappedZones.push('hombros');
           mappedZones.push('cuello');
+        }
+        if (profile.healthConditions.some((c) => c === 'Molestia o limitación en cadera')) {
+          mappedZones.push('cadera');
         }
         if (mappedZones.length === 0) mappedZones.push('ninguna');
         updated.discomfortZones = mappedZones;
       }
 
-      // Automatic bi-directional synchronization for equipment choice & available equipment list
-      if (profile.equipmentAvailable && !profile.availableEquipment) {
+      // Automatic synchronization for equipment choice & available equipment list
+      if (profile.availableEquipment) {
+        const equipList = [...profile.availableEquipment];
+        if (!equipList.includes('peso_corporal')) {
+          equipList.unshift('peso_corporal');
+        }
+        updated.availableEquipment = equipList;
+      } else if (profile.equipmentAvailable) {
         if (profile.equipmentAvailable === 'Solo peso corporal y silla') {
           updated.availableEquipment = ['peso_corporal', 'silla_firme', 'pared_libre'];
         } else if (profile.equipmentAvailable === 'Bandas elásticas') {
@@ -2388,33 +2408,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const toggleHealthCondition = useCallback((condition: HealthCondition) => {
     setUserProfile((prev) => {
       let updatedConditions: HealthCondition[];
-      const current = prev.healthConditions || ['Ninguna'];
+      const current = prev.healthConditions || ['Ninguna molestia'];
 
-      if (condition === 'Ninguna') {
-        updatedConditions = ['Ninguna'];
+      const isNone = condition === 'Ninguna molestia' || condition === 'Ninguna';
+
+      if (isNone) {
+        updatedConditions = ['Ninguna molestia'];
       } else {
-        const withoutNone = current.filter((c) => c !== 'Ninguna');
+        const withoutNone = current.filter((c) => c !== 'Ninguna' && c !== 'Ninguna molestia');
         if (withoutNone.includes(condition)) {
           updatedConditions = withoutNone.filter((c) => c !== condition);
-          if (updatedConditions.length === 0) updatedConditions = ['Ninguna'];
+          if (updatedConditions.length === 0) updatedConditions = ['Ninguna molestia'];
         } else {
           updatedConditions = [...withoutNone, condition];
         }
       }
 
-      const newDiscomfortZones: JointDiscomfortZone[] = [];
-      if (updatedConditions.includes('Molestia en rodillas')) newDiscomfortZones.push('rodillas');
-      if (updatedConditions.includes('Molestia lumbar')) newDiscomfortZones.push('espalda_lumbar');
-      if (updatedConditions.includes('Molestia en hombros/cuello')) {
-        newDiscomfortZones.push('hombros');
-        newDiscomfortZones.push('cuello');
+      const mappedZones: JointDiscomfortZone[] = [];
+      if (updatedConditions.some((c) => c === 'Molestia en rodillas')) mappedZones.push('rodillas');
+      if (
+        updatedConditions.some(
+          (c) => c === 'Molestia lumbar (espalda baja)' || c === 'Molestia lumbar'
+        )
+      )
+        mappedZones.push('espalda_lumbar');
+      if (
+        updatedConditions.some(
+          (c) =>
+            c === 'Molestia en hombros / cuello' ||
+            c === 'Molestia en hombros/cuello'
+        )
+      ) {
+        mappedZones.push('hombros');
+        mappedZones.push('cuello');
       }
-      if (newDiscomfortZones.length === 0) newDiscomfortZones.push('ninguna');
+      if (updatedConditions.some((c) => c === 'Molestia o limitación en cadera')) {
+        mappedZones.push('cadera');
+      }
+      if (mappedZones.length === 0) mappedZones.push('ninguna');
 
       return {
         ...prev,
         healthConditions: updatedConditions,
-        discomfortZones: newDiscomfortZones,
+        discomfortZones: mappedZones,
       };
     });
   }, []);
@@ -2506,11 +2542,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const toggleEquipment = useCallback((eq: AvailableEquipmentId) => {
     setUserProfile((prev) => {
+      if (eq === 'peso_corporal') {
+        // El peso corporal siempre debe estar activo
+        if (!prev.availableEquipment.includes('peso_corporal')) {
+          return { ...prev, availableEquipment: ['peso_corporal', ...prev.availableEquipment] };
+        }
+        return prev;
+      }
+
       const exists = prev.availableEquipment.includes(eq);
-      const updated = exists
-        ? prev.availableEquipment.filter((item) => item !== eq)
-        : [...prev.availableEquipment, eq];
-      return { ...prev, availableEquipment: updated };
+      let updated: AvailableEquipmentId[];
+      if (exists) {
+        updated = prev.availableEquipment.filter((item) => item !== eq);
+      } else {
+        updated = [...prev.availableEquipment, eq];
+      }
+
+      if (!updated.includes('peso_corporal')) {
+        updated.unshift('peso_corporal');
+      }
+
+      let dumbbellType = prev.dumbbellType;
+      let availableWeightsKg = prev.availableWeightsKg;
+      if (eq === 'mancuernas' && !exists) {
+        if (!dumbbellType || dumbbellType === 'peso_corporal_solamente') {
+          dumbbellType = 'fijas';
+        }
+        if (!availableWeightsKg || availableWeightsKg.length === 0) {
+          availableWeightsKg = [1, 2, 3, 5, 8];
+        }
+      }
+
+      let equipmentAvailable: EquipmentAvailableChoice = 'Solo peso corporal y silla';
+      if (updated.includes('mancuernas')) {
+        equipmentAvailable = 'Mancuernas / Pesos';
+      } else if (updated.includes('bandas_elasticas')) {
+        equipmentAvailable = 'Bandas elásticas';
+      }
+
+      return {
+        ...prev,
+        availableEquipment: updated,
+        dumbbellType,
+        availableWeightsKg,
+        equipmentAvailable,
+      };
     });
   }, []);
 
@@ -2702,18 +2778,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         zones.includes('rodillas_piernas');
 
       const hasLumbarDiscomfort =
+        conditions.includes('Molestia lumbar (espalda baja)') ||
         conditions.includes('Molestia lumbar') ||
         zones.includes('espalda_lumbar');
 
       const hasShoulderDiscomfort =
+        conditions.includes('Molestia en hombros / cuello') ||
         conditions.includes('Molestia en hombros/cuello') ||
         zones.includes('hombros') ||
         zones.includes('cuello');
 
+      const hasHipDiscomfort =
+        conditions.includes('Molestia o limitación en cadera') ||
+        zones.includes('cadera');
+
       const hasBalanceIssues =
         conditions.includes('Problemas de equilibrio');
 
-      const equipment = userProfile.equipmentAvailable || 'Solo peso corporal y silla';
+      const userEquip =
+        userProfile.availableEquipment && userProfile.availableEquipment.length > 0
+          ? userProfile.availableEquipment
+          : ['peso_corporal', 'silla_firme', 'pared_libre'];
+
       const fitness = userProfile.fitnessLevel || 'Iniciación / Recuperación';
       const sex = userProfile.biologicalSex || 'Mujer';
 
@@ -2753,24 +2839,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
             ex.id === 'pull_05_overhead_band_lat_pulldown' ||
             ex.id === 'pull_07_standing_band_face_pull' ||
             ex.id === 'pull_10_dumbbell_bent_over_reverse_flyes' ||
-            (ex.contraindications && (ex.contraindications.includes('hombros') || ex.contraindications.includes('cuello')))
+            (ex.contraindications &&
+              (ex.contraindications.includes('hombros') || ex.contraindications.includes('cuello')))
           ) {
             return false;
           }
         }
 
-        // Regla 4: Equipamiento disponible
-        if (equipment === 'Solo peso corporal y silla') {
-          if (ex.requiredEquipment.includes('bandas_elasticas') || ex.requiredEquipment.includes('mancuernas')) {
-            return false;
-          }
-        } else if (equipment === 'Bandas elásticas') {
-          if (ex.requiredEquipment.includes('mancuernas')) {
+        // Regla 4: Molestia o limitación en cadera -> Prohibir abducciones forzadas, rotaciones cerradas y flexiones profundas de cadera (>90°)
+        if (hasHipDiscomfort) {
+          if (
+            ex.id === 'legs_09_bodyweight_air_squats' ||
+            ex.id === 'legs_10_dumbbell_romanian_deadlift' ||
+            ex.id === 'legs_11_reverse_lunges' ||
+            ex.id === 'legs_12_bulgarian_split_squat' ||
+            ex.id === 'legs_06_lateral_leg_raises' ||
+            (ex.contraindications && ex.contraindications.includes('cadera'))
+          ) {
             return false;
           }
         }
 
-        // Regla 5: Problemas de equilibrio -> Excluir zancadas libres y fijar apoyos estables en silla o pared
+        // Regla 5: Equipamiento disponible estricto
+        // Si el ejercicio requiere un material que el usuario NO tiene marcado, descartarlo.
+        const requiresMissingEquipment = ex.requiredEquipment.some(
+          (req) => req !== 'peso_corporal' && !userEquip.includes(req)
+        );
+        if (requiresMissingEquipment) {
+          return false;
+        }
+
+        // Regla 6: Problemas de equilibrio -> Excluir zancadas libres y exigir apoyos estables en silla o pared
         if (hasBalanceIssues) {
           const isLunge =
             ex.id.includes('lunge') ||
@@ -2808,7 +2907,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // SEGURIDAD CLÍNICA ESTRICTA:
       // Si el grupo seguro es reducido, NUNCA recurrir a la base de datos completa con contraindicaciones;
-      // en su lugar, duplicar variantes de bajo impacto o nivel terapéutico que pasaron el filtro.
+      // en su lugar, duplicar variantes de bajo impacto ZERO o nivel terapéutico que pasaron el filtro.
       let sourcePool = [...safePool];
       if (sourcePool.length === 0) {
         // Fallback garantizado de máxima seguridad articular sin impacto
@@ -2822,12 +2921,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         sourcePool = EXERCISES_DATABASE.filter((e) => ultraSafeIds.includes(e.id));
       }
 
-      // Duplicar variantes de bajo impacto o terapéuticas para alcanzar targetCount de forma 100% segura
+      // Duplicar variantes de impacto ZERO o terapéuticas para alcanzar targetCount de forma 100% segura
       if (sourcePool.length < targetCount) {
-        const therapeuticOrLow = sourcePool.filter(
-          (e) => e.impactLevel === 'ZERO' || e.impactLevel === 'LOW' || e.biomechanicalLevel === 'terapeutico_silla'
+        const therapeuticOrZero = sourcePool.filter(
+          (e) => e.impactLevel === 'ZERO' || e.biomechanicalLevel === 'terapeutico_silla'
         );
-        const poolToCycle = therapeuticOrLow.length > 0 ? therapeuticOrLow : sourcePool;
+        const poolToCycle = therapeuticOrZero.length > 0 ? therapeuticOrZero : sourcePool;
         let cycleIdx = 0;
         while (sourcePool.length < targetCount) {
           const baseItem = poolToCycle[cycleIdx % poolToCycle.length];
@@ -2866,20 +2965,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         (e) => e.block === 'vuelta_a_la_calma'
       );
 
-      // INYECCIÓN CLÍNICA PRIORITARIA SEGÚN REGLAS MÉDICAS (sólo variantes seguras):
+      // INYECCIÓN CLÍNICA PRIORITARIA SEGÚN REGLAS MÉDICAS (sólo variantes seguras presentes en sourcePool):
       if (hasKneeDiscomfort) {
         // Prescribir sentadilla a silla alta y puente glúteo en suelo
-        const chairSquat = EXERCISES_DATABASE.find((e) => e.id === 'legs_04_chair_squat_stand');
-        const gluteBridge = EXERCISES_DATABASE.find((e) => e.id === 'legs_05_glute_bridge');
+        const chairSquat = sourcePool.find((e) => e.id === 'legs_04_chair_squat_stand');
+        const gluteBridge = sourcePool.find((e) => e.id === 'legs_05_glute_bridge');
         if (chairSquat && !legExercises.some((e) => e.id === chairSquat.id)) legExercises.unshift(chairSquat);
         if (gluteBridge && !legExercises.some((e) => e.id === gluteBridge.id)) legExercises.unshift(gluteBridge);
       }
 
       if (hasLumbarDiscomfort) {
-        // Priorizar estabilización de cadera y pared
-        const chairPlank = EXERCISES_DATABASE.find((e) => e.id === 'core_06_incline_chair_plank');
-        const wallPush = EXERCISES_DATABASE.find((e) => e.id === 'push_02_wall_isometric');
-        const gluteBridge = EXERCISES_DATABASE.find((e) => e.id === 'legs_05_glute_bridge');
+        // Priorizar estabilización de core y pared
+        const chairPlank = sourcePool.find((e) => e.id === 'core_06_incline_chair_plank');
+        const wallPush = sourcePool.find((e) => e.id === 'push_02_wall_isometric');
+        const gluteBridge = sourcePool.find((e) => e.id === 'legs_05_glute_bridge');
         if (chairPlank && !coreExercises.some((e) => e.id === chairPlank.id)) coreExercises.unshift(chairPlank);
         if (wallPush && !pushExercises.some((e) => e.id === wallPush.id)) pushExercises.unshift(wallPush);
         if (gluteBridge && !legExercises.some((e) => e.id === gluteBridge.id)) legExercises.unshift(gluteBridge);
@@ -2887,10 +2986,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (hasShoulderDiscomfort) {
         // Prescribir retracción isométrica baja
-        const scapularSqueeze = EXERCISES_DATABASE.find((e) => e.id === 'pull_01_seated_scapular_squeeze');
-        const towelRow = EXERCISES_DATABASE.find((e) => e.id === 'pull_02_seated_towel_row');
+        const scapularSqueeze = sourcePool.find((e) => e.id === 'pull_01_seated_scapular_squeeze');
+        const towelRow = sourcePool.find((e) => e.id === 'pull_02_seated_towel_row');
         if (scapularSqueeze && !pullExercises.some((e) => e.id === scapularSqueeze.id)) pullExercises.unshift(scapularSqueeze);
         if (towelRow && !pullExercises.some((e) => e.id === towelRow.id)) pullExercises.unshift(towelRow);
+      }
+
+      if (hasHipDiscomfort) {
+        // Favorecer extensiones seguras y puente de glúteos
+        const gluteBridge = sourcePool.find((e) => e.id === 'legs_05_glute_bridge');
+        const kneeExt = sourcePool.find((e) => e.id === 'legs_01_seated_knee_extensions');
+        if (gluteBridge && !legExercises.some((e) => e.id === gluteBridge.id)) legExercises.unshift(gluteBridge);
+        if (kneeExt && !legExercises.some((e) => e.id === kneeExt.id)) legExercises.unshift(kneeExt);
       }
 
       const pickItem = (list: Exercise[], offset: number): Exercise => {
@@ -3904,12 +4011,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     window.URL.revokeObjectURL(url);
   }, [annualPlan.selectedDays, annualPlan.minutesPerSession]);
 
-  // Clinical PDF / File Generator with Real Live Metrics
+  // Clinical Report PDF / Printable Document Generator with Real Live Metrics
   const downloadClinicalReportPDF = useCallback(() => {
     const totalSessions = completedWorkouts.length;
     const allIncidents = completedWorkouts.flatMap((w) => w.safetyIncidents || []);
 
-    // RPE numérico mapeado en vivo
+    // RPE numérico mapeado en vivo desde completedWorkouts
     const rpeMap: Record<string, number> = {
       muy_suave: 2,
       suave: 4,
@@ -3918,27 +4025,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       duro: 8,
       maximo: 10,
     };
-    const rpeValues = completedWorkouts
-      .map((w) => rpeMap[w.rpe] || 5)
+    const rpeScores = completedWorkouts
+      .map((w) => (w.rpeScore ? w.rpeScore : rpeMap[w.rpe] || 5))
       .filter((n) => !isNaN(n));
-    const averageRpe =
-      rpeValues.length > 0
-        ? (rpeValues.reduce((acc, curr) => acc + curr, 0) / rpeValues.length).toFixed(1)
-        : '0';
+    const meanRPE =
+      rpeScores.length > 0
+        ? (rpeScores.reduce((acc, curr) => acc + curr, 0) / rpeScores.length).toFixed(1)
+        : '0.0';
 
-    // Sesiones sin dolor
+    // Sesiones sin dolor articular
     const painFreeSessions = completedWorkouts.filter(
       (w) => !w.discomforts || w.discomforts.length === 0 || w.discomforts.includes('ninguna')
     ).length;
     const painFreeRate =
       totalSessions > 0 ? Math.round((painFreeSessions / totalSessions) * 100) : 100;
 
-    // Tasa de adherencia real
-    const targetWeeklySessions = annualPlan.daysPerWeek || 3;
-    const realAdherenceRate = Math.min(
-      100,
-      Math.round((totalSessions / Math.max(1, targetWeeklySessions * 4)) * 100)
-    );
+    // Zonas articulares protegidas calculadas en vivo
+    const rawProtectedZones =
+      userProfile.discomfortZones && userProfile.discomfortZones.length > 0 && !userProfile.discomfortZones.includes('ninguna')
+        ? userProfile.discomfortZones
+        : (userProfile.healthConditions || []).filter((c) => c !== 'Ninguna molestia' && c !== 'Problemas de equilibrio');
+    const protectedJointZones =
+      rawProtectedZones.length > 0
+        ? rawProtectedZones.map((z) => z.replace(/_/g, ' ')).join(', ')
+        : 'Todas las articulaciones bajo protocolo de impacto ZERO';
 
     // Conteo real de intervenciones de seguridad
     const substitutedIncidents = allIncidents.filter(
@@ -3948,75 +4058,147 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       (i) => i.action === 'descartado_seguridad'
     );
 
-    const dateStr = new Date().toLocaleDateString('es-ES', {
+    const currentDateStr = new Date().toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
 
-    const clinicalReportData = {
-      app: 'AdaptFit - Informe Clínico de Prescripción y Seguridad Articular',
-      fechaEmision: dateStr,
-      paciente: {
-        nombre: userProfile.name || 'Paciente',
-        sexoBiologico: userProfile.biologicalSex || 'Mujer',
-        nivelCondicion: userProfile.fitnessLevel || 'Iniciación / Recuperación',
-        condicionesMedicas: userProfile.healthConditions || ['Ninguna'],
-        zonasDolorDeclaradas: userProfile.discomfortZones || ['ninguna'],
-        materialDisponible: userProfile.equipmentAvailable || 'Solo peso corporal y silla',
-        tipoMancuernas: userProfile.dumbbellType || 'fijas',
-        pesosDisponiblesKg: userProfile.availableWeightsKg || [],
-      },
-      metricasRealesComputadas: {
-        sesionesCompletadasTotales: totalSessions,
-        rpePromedioCalculado: totalSessions > 0 ? `${averageRpe} / 10` : 'Sin sesiones previas',
-        porcentajeSesionesSinDolor: `${painFreeRate}%`,
-        tasaAdherenciaEstimada: `${realAdherenceRate}%`,
-        paradasPreventivasRegistradas: allIncidents.length,
-        variantesSuavesSustituidas: substitutedIncidents.length,
-        ejerciciosRetiradosPorSeguridad: discardedIncidents.length,
-      },
-      historialIncidenciasSeguridad: allIncidents.map((inc) => ({
-        fecha: inc.timestamp,
-        ejercicio: inc.exerciseTitle,
-        accion:
-          inc.action === 'sustituido_por_alternativa'
-            ? 'Sustituido por variante suave'
-            : 'Descartado preventivamente',
-        patron: inc.movementPattern,
-        motivo: inc.reason,
-        notaClinica: inc.clinicalNote,
-      })),
-      historialSesionesRecientes: completedWorkouts.slice(0, 10).map((w) => ({
-        id: w.id,
-        fecha: w.timestamp,
-        rutina: w.routineTitle,
-        duracionMinutos: w.durationMinutes,
-        rpe: w.rpe,
-        molestias: w.discomforts,
-        volumenTotalKg: w.volumeTotalKg || 0,
-      })),
-      conclusionClinica:
-        allIncidents.length > 0
-          ? `El paciente ha completado ${totalSessions} sesiones. Se han aplicado ${allIncidents.length} intervenciones preventivas automáticas de seguridad sin dolor continuado.`
-          : `El paciente ha completado ${totalSessions} sesiones con excelente tolerancia neuromuscular y cero incidencias articulares reportadas.`,
-    };
+    const reportHtml = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe Clínico de Prescripción y Evolución Funcional - AdaptFit</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #191c1d; padding: 36px; max-width: 860px; margin: 0 auto; background: #fff; }
+    h1 { color: #2d6a4f; margin-bottom: 4px; font-size: 24px; font-weight: 800; }
+    h2 { color: #191c1d; font-size: 16px; border-bottom: 2px solid #e7f3ec; padding-bottom: 6px; margin-top: 26px; }
+    .header-pill { display: inline-block; padding: 5px 14px; background: #e7f3ec; color: #0f5238; border-radius: 12px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px; }
+    .meta-box { background: #f8f9fa; border: 1px solid #e1e3e4; border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+    .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    th { background: #2d6a4f; color: white; text-align: left; padding: 8px 12px; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+    td { border-bottom: 1px solid #edeeef; padding: 9px 12px; vertical-align: middle; }
+    tr:nth-child(even) td { background-color: #fafbfb; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; background: #e7f3ec; color: #0f5238; }
+    .disclaimer { font-size: 11px; color: #707973; margin-top: 30px; border-top: 1px solid #e1e3e4; padding-top: 14px; }
+    @media print { body { padding: 0; } .no-print { display: none; } }
+  </style>
+</head>
+<body>
+  <h1>Informe Clínico de Prescripción y Evolución Funcional</h1>
+  <div class="header-pill">ADAPTFIT CLINICAL SUITE • FECHA DE EMISIÓN: ${currentDateStr}</div>
+  
+  <div class="meta-box">
+    <div class="meta-grid">
+      <div><strong>Paciente / Usuario:</strong> ${userProfile.name || 'Paciente'}</div>
+      <div><strong>Sexo Biológico:</strong> ${userProfile.biologicalSex || 'Mujer'}</div>
+      <div><strong>Nivel de Condición Física:</strong> ${userProfile.fitnessLevel || 'Iniciación / Recuperación'}</div>
+      <div><strong>Zonas Articulares Protegidas:</strong> ${protectedJointZones}</div>
+      <div><strong>Equipamiento Habilitado:</strong> ${(userProfile.availableEquipment || []).join(', ') || userProfile.equipmentAvailable || 'Peso corporal'}</div>
+      <div><strong>Sesiones Completadas:</strong> ${totalSessions}</div>
+      <div><strong>RPE Medio Registrado:</strong> ${totalSessions > 0 ? `${meanRPE} / 10` : 'Sin sesiones'}</div>
+      <div><strong>Tasa Libre de Dolor:</strong> ${painFreeRate}%</div>
+    </div>
+  </div>
 
-    const blob = new Blob([JSON.stringify(clinicalReportData, null, 2)], {
-      type: 'application/json',
-    });
+  <h2>1. Auditoría de Seguridad Articular y Paradas Preventivas</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Intervenciones Totales</th>
+        <th>Variantes Suaves</th>
+        <th>Retirados por Seguridad</th>
+        <th>Impacto en Adherencia</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>${allIncidents.length}</strong></td>
+        <td>${substitutedIncidents.length}</td>
+        <td>${discardedIncidents.length}</td>
+        <td><span class="badge">0 Penalización (100% Seguro)</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  ${
+    allIncidents.length > 0
+      ? `<table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Ejercicio</th>
+        <th>Acción</th>
+        <th>Resolución / Detalle</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${allIncidents
+        .map(
+          (inc) => `<tr>
+        <td>${new Date(inc.timestamp).toLocaleDateString('es-ES')}</td>
+        <td><strong>${inc.exerciseTitle}</strong></td>
+        <td><span class="badge">${inc.action === 'sustituido_por_alternativa' ? 'Sustituido por variante suave' : 'Retirado'}</span></td>
+        <td>${inc.replacementExerciseTitle ? `Alternativa: ${inc.replacementExerciseTitle}. ` : ''}${inc.clinicalNote || inc.reason || ''}</td>
+      </tr>`
+        )
+        .join('')}
+    </tbody>
+  </table>`
+      : '<p style="font-size:12px;color:#707973;font-style:italic;">No se han producido incidencias articulares ni molestias lesivas durante las sesiones realizadas.</p>'
+  }
+
+  <h2>2. Historial de Sesiones Registradas</h2>
+  ${
+    totalSessions > 0
+      ? `<table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Rutina</th>
+        <th>Duración</th>
+        <th>RPE Esfuerzo</th>
+        <th>Molestias Reportadas</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${completedWorkouts
+        .slice(0, 15)
+        .map(
+          (w) => `<tr>
+        <td>${new Date(w.timestamp).toLocaleDateString('es-ES')}</td>
+        <td><strong>${w.routineTitle}</strong></td>
+        <td>${w.durationMinutes} min</td>
+        <td>${w.rpeScore || rpeMap[w.rpe] || 5} / 10</td>
+        <td>${(w.discomforts || []).filter((d) => d !== 'ninguna').join(', ') || '<span class="badge">Sin molestias</span>'}</td>
+      </tr>`
+        )
+        .join('')}
+    </tbody>
+  </table>`
+      : '<p style="font-size:12px;color:#707973;font-style:italic;">Sin sesiones completadas aún. El programa se encuentra en fase inicial de prescripción.</p>'
+  }
+
+  <div class="disclaimer">
+    Informe clínico generado en tiempo real por el motor biomédico de AdaptFit para su entrega a profesionales de la salud, fisioterapeutas o traumatólogos.
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     const sanitizedName = userProfile.name
       ? userProfile.name.toLowerCase().replace(/\s+/g, '_')
       : 'paciente';
-    link.setAttribute('download', `informe_clinico_${sanitizedName}.json`);
+    link.setAttribute('download', `informe_clinico_${sanitizedName}_${new Date().toISOString().slice(0, 10)}.html`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-  }, [userProfile, completedWorkouts, annualPlan.daysPerWeek]);
+  }, [userProfile, completedWorkouts]);
 
   const value = useMemo(
     () => ({

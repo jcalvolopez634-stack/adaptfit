@@ -10,6 +10,7 @@ import {
   HealthCondition,
   EquipmentAvailableChoice,
   DumbbellType,
+  AvailableEquipmentId,
 } from '../types';
 import { calculateBMI } from '../utils/anthropometry';
 import {
@@ -103,6 +104,11 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       ? userProfile.healthConditions
       : ['Ninguna']
   );
+  const [availableEquipment, setAvailableEquipment] = useState<AvailableEquipmentId[]>(
+    userProfile.availableEquipment && userProfile.availableEquipment.length > 0
+      ? userProfile.availableEquipment
+      : ['peso_corporal', 'silla_firme', 'pared_libre']
+  );
   const [equipmentAvailable, setEquipmentAvailable] = useState<EquipmentAvailableChoice>(
     userProfile.equipmentAvailable || 'Solo peso corporal y silla'
   );
@@ -127,10 +133,10 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
   };
 
   const toggleCondition = (item: HealthCondition) => {
-    if (item === 'Ninguna') {
+    if (item === 'Ninguna' || item === 'Ninguna molestia') {
       setHealthConditions(['Ninguna']);
     } else {
-      let filtered = healthConditions.filter((c) => c !== 'Ninguna');
+      let filtered = healthConditions.filter((c) => c !== 'Ninguna' && c !== 'Ninguna molestia');
       if (filtered.includes(item)) {
         filtered = filtered.filter((c) => c !== item);
         if (filtered.length === 0) filtered = ['Ninguna'];
@@ -139,6 +145,23 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       }
       setHealthConditions(filtered);
     }
+  };
+
+  const toggleEquipmentItem = (item: AvailableEquipmentId) => {
+    if (item === 'peso_corporal') return; // Siempre activo
+    let updated: AvailableEquipmentId[];
+    if (availableEquipment.includes(item)) {
+      updated = availableEquipment.filter((eq) => eq !== item);
+    } else {
+      updated = [...availableEquipment, item];
+      if (item === 'mancuernas' && dumbbellType === 'peso_corporal_solamente') {
+        setDumbbellType('fijas');
+      }
+    }
+    if (!updated.includes('peso_corporal')) {
+      updated.unshift('peso_corporal');
+    }
+    setAvailableEquipment(updated);
   };
 
   const [showConfirmReset, setShowConfirmReset] = useState(false);
@@ -195,7 +218,12 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
       biologicalSex,
       fitnessLevel,
       healthConditions,
-      equipmentAvailable,
+      availableEquipment,
+      equipmentAvailable: availableEquipment.includes('mancuernas')
+        ? 'Mancuernas / Pesos'
+        : availableEquipment.includes('bandas_elasticas')
+        ? 'Bandas elásticas'
+        : 'Solo peso corporal y silla',
       dumbbellType,
       availableWeightsKg: [...availableWeightsKg].sort((a, b) => a - b),
     });
@@ -484,32 +512,40 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
 
           {/* Puntos Sensibles / Condiciones de Salud */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-[#707973] block">
-              Zonas de Protección Articular
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-[#191C1D] block">
+                Zonas de Protección Articular
+              </label>
+              <span className="text-[10px] text-[#707973]">Selección múltiple</span>
+            </div>
             <div className="grid grid-cols-1 gap-1.5">
-              {(
-                [
-                  'Molestia lumbar',
-                  'Molestia en rodillas',
-                  'Molestia en hombros/cuello',
-                  'Problemas de equilibrio',
-                  'Ninguna',
-                ] as HealthCondition[]
-              ).map((cond) => {
-                const isSelected = healthConditions.includes(cond);
+              {[
+                { id: 'Molestia en rodillas' as HealthCondition, label: 'Molestia en rodillas' },
+                { id: 'Molestia lumbar (espalda baja)' as HealthCondition, label: 'Molestia lumbar (espalda baja)' },
+                { id: 'Molestia en hombros / cuello' as HealthCondition, label: 'Molestia en hombros / cuello' },
+                { id: 'Molestia o limitación en cadera' as HealthCondition, label: 'Molestia o limitación en cadera' },
+                { id: 'Problemas de equilibrio' as HealthCondition, label: 'Problemas de equilibrio' },
+                { id: 'Ninguna' as HealthCondition, label: 'Ninguna molestia (Articulaciones libres)' },
+              ].map((item) => {
+                const isSelected =
+                  item.id === 'Ninguna'
+                    ? healthConditions.includes('Ninguna') || healthConditions.includes('Ninguna molestia')
+                    : healthConditions.includes(item.id) ||
+                      (item.id === 'Molestia lumbar (espalda baja)' && healthConditions.includes('Molestia lumbar')) ||
+                      (item.id === 'Molestia en hombros / cuello' && healthConditions.includes('Molestia en hombros/cuello'));
+
                 return (
                   <button
-                    key={cond}
+                    key={item.id}
                     type="button"
-                    onClick={() => toggleCondition(cond)}
-                    className={`py-1.5 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all ${
+                    onClick={() => toggleCondition(item.id)}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all ${
                       isSelected
                         ? 'bg-[#E7F3EC] border border-[#B1F0CE] text-[#0F5238] font-bold'
-                        : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943]'
+                        : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943] hover:bg-[#F3F4F5]'
                     }`}
                   >
-                    <span>{cond}</span>
+                    <span>{item.label}</span>
                     <div
                       className={`w-4 h-4 rounded-md flex items-center justify-center ${
                         isSelected ? 'bg-[#2D6A4F] text-white' : 'border border-[#C4C8C5] bg-white'
@@ -523,33 +559,55 @@ export const ProfileSettingsModal: React.FC<ProfileSettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Equipamiento Disponible */}
+          {/* Equipamiento Disponible (Multi-Selección de Checkboxes) */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-[#707973] block">
-              Equipamiento Disponible
-            </label>
-            <div className="grid grid-cols-1 gap-1.5">
-              {(
-                [
-                  'Solo peso corporal y silla',
-                  'Bandas elásticas',
-                  'Mancuernas / Pesos',
-                ] as EquipmentAvailableChoice[]
-              ).map((eq) => (
-                <button
-                  key={eq}
-                  type="button"
-                  onClick={() => setEquipmentAvailable(eq)}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold text-left transition-all flex items-center justify-between ${
-                    equipmentAvailable === eq
-                      ? 'bg-[#2D6A4F] text-white font-bold shadow-2xs'
-                      : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943]'
-                  }`}
-                >
-                  <span>{eq}</span>
-                  {equipmentAvailable === eq && <Check className="w-3.5 h-3.5" />}
-                </button>
-              ))}
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-[#191C1D] block">
+                Equipamiento Disponible en Casa
+              </label>
+              <span className="text-[10px] text-[#707973]">Selección múltiple</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {[
+                { id: 'peso_corporal' as AvailableEquipmentId, label: 'Peso corporal', icon: '🧘', desc: 'Base obligatoria' },
+                { id: 'silla_firme' as AvailableEquipmentId, label: 'Silla firme / Banco', icon: '🪑', desc: 'Apoyo y sentado' },
+                { id: 'pared_libre' as AvailableEquipmentId, label: 'Pared despejada', icon: '🧱', desc: 'Apoyo vertical' },
+                { id: 'bandas_elasticas' as AvailableEquipmentId, label: 'Bandas elásticas', icon: '🎗️', desc: 'Resistencia suave' },
+                { id: 'mancuernas' as AvailableEquipmentId, label: 'Mancuernas / Pesos', icon: '🏋️', desc: 'Carga libre' },
+                { id: 'esterilla' as AvailableEquipmentId, label: 'Esterilla / Suelo', icon: '🧘‍♂️', desc: 'Comodidad en suelo' },
+              ].map((eq) => {
+                const isSelected = availableEquipment.includes(eq.id);
+                const isMandatory = eq.id === 'peso_corporal';
+
+                return (
+                  <button
+                    key={eq.id}
+                    type="button"
+                    onClick={() => toggleEquipmentItem(eq.id)}
+                    disabled={isMandatory}
+                    className={`py-2 px-2.5 rounded-xl text-xs font-semibold text-left transition-all flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-[#E7F3EC] border border-[#B1F0CE] text-[#0F5238] font-bold shadow-2xs'
+                        : 'bg-[#F8F9FA] border border-[#EDEEEF] text-[#404943] hover:bg-[#F3F4F5]'
+                    } ${isMandatory ? 'cursor-default opacity-90' : ''}`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-sm">{eq.icon}</span>
+                      <div className="truncate">
+                        <span className="block truncate leading-tight">{eq.label}</span>
+                        <span className="text-[9px] text-[#707973] block leading-tight">{eq.desc}</span>
+                      </div>
+                    </div>
+                    <div
+                      className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 ml-1 ${
+                        isSelected ? 'bg-[#2D6A4F] text-white' : 'border border-[#C4C8C5] bg-white'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

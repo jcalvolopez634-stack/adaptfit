@@ -953,7 +953,7 @@ export const EXERCISES_DATABASE: CatalogExercise[] = [
     biomechanicalLevel: 'medio_perdida_peso',
     movementPattern: 'dominante_rodilla',
     requiredEquipment: ['peso_corporal'],
-    contraindications: ['rodillas', 'espalda_lumbar'],
+    contraindications: ['rodillas', 'espalda_lumbar', 'cadera'],
     setupStep0: 'De pie con pies a la anchura de hombros, puntas ligeramente hacia afuera (15-30 grados) y brazos al frente para balance.',
     steps1To3: [
       'Inicia flexionando caderas y rodillas a la vez descendiendo hasta que los muslos queden paralelos al suelo.',
@@ -978,7 +978,7 @@ export const EXERCISES_DATABASE: CatalogExercise[] = [
     biomechanicalLevel: 'avanzado_fuerza',
     movementPattern: 'bisagra_cadera',
     requiredEquipment: ['mancuernas'],
-    contraindications: ['espalda_lumbar'],
+    contraindications: ['espalda_lumbar', 'cadera'],
     setupStep0: 'Ponte de pie con pies al ancho de caderas, sostén una mancuerna en cada mano frente a los muslos con hombros hacia atrás.',
     steps1To3: [
       'Empuja la cadera hacia atrás manteniendo las mancuernas pegadas a las piernas mientras descienden.',

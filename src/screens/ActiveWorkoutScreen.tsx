@@ -38,6 +38,40 @@ import {
   Minus,
 } from 'lucide-react';
 
+// Web Audio API beep generator: 3 short beeps + 1 long beep
+function playBeep(type: 'short' | 'long') {
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+
+    if (type === 'short') {
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5 corto
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } else {
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 largo y resolutivo
+      gain.gain.setValueAtTime(0.22, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.55);
+    }
+  } catch {
+    // Audio policy fallback
+  }
+}
+
 // Web Audio API chimes generator
 function playChime(frequency = 587.33, durationMs = 200) {
   try {
@@ -153,30 +187,69 @@ export const ActiveWorkoutScreen: React.FC = () => {
     }
   };
 
-  // Sound tone effect when active seconds or rest reach 3, 2, 1 and 0
+  // Sound tone effect when active seconds or rest reach 3, 2, 1 and 0 (3 short beeps + 1 long beep)
   useEffect(() => {
     if (activeWorkout.isPlaying) {
       if (phase === 'SET_ACTIVE') {
         const s = activeWorkout.secondsRemaining;
         if (s === 3 || s === 2 || s === 1) {
-          playChime(440, 100);
+          playBeep('short');
         } else if (s === 0 && prevSecondsRef.current > 0) {
-          playChime(659.25, 250);
-          setTimeout(() => playChime(880, 350), 200);
+          playBeep('long');
         }
       } else if (phase === 'REST') {
         const r = activeWorkout.restSecondsRemaining;
         if (r === 3 || r === 2 || r === 1) {
-          playChime(523.25, 100);
+          playBeep('short');
         } else if (r === 0 && prevRestRef.current > 0) {
-          playChime(587.33, 250);
-          setTimeout(() => playChime(880, 350), 200);
+          playBeep('long');
         }
       }
     }
     prevSecondsRef.current = activeWorkout.secondsRemaining;
     prevRestRef.current = activeWorkout.restSecondsRemaining;
   }, [activeWorkout.secondsRemaining, activeWorkout.restSecondsRemaining, activeWorkout.isPlaying, phase]);
+
+  // Screen Wake Lock: mantener la pantalla encendida durante el entrenamiento activo
+  useEffect(() => {
+    let wakeLockSentinel: any = null;
+
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator && activeWorkout.isPlaying) {
+        try {
+          wakeLockSentinel = await (navigator as any).wakeLock.request('screen');
+        } catch {
+          // Navegador bloqueó wakeLock o no soportado
+        }
+      }
+    }
+
+    if (activeWorkout.isPlaying) {
+      requestWakeLock();
+    } else if (wakeLockSentinel) {
+      try {
+        wakeLockSentinel.release();
+      } catch {}
+      wakeLockSentinel = null;
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && activeWorkout.isPlaying) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLockSentinel) {
+        try {
+          wakeLockSentinel.release();
+        } catch {}
+      }
+    };
+  }, [activeWorkout.isPlaying]);
 
   // Audio guide speech synthesis cue on phase switch or exercise change
   useEffect(() => {
@@ -1117,18 +1190,18 @@ export const ActiveWorkoutScreen: React.FC = () => {
           type="button"
           id="panic-button-active-workout"
           onClick={openPanicReplacementModal}
-          className="w-full p-4 rounded-2xl bg-[#EAF5EF] border border-[#2D6A4F]/25 text-[#0F5238] hover:bg-[#DEF0E5] active:scale-[0.99] transition-all flex items-center justify-between shadow-2xs group"
+          className="w-full p-4 rounded-2xl bg-[#EAF5EF] border border-[#2D6A4F]/30 text-[#0F5238] hover:bg-[#DEF0E5] active:scale-[0.99] transition-all flex items-center justify-between shadow-2xs group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#2D6A4F] text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <ShieldCheck className="w-5 h-5 text-[#B1F0CE]" />
+            <div className="w-10 h-10 rounded-xl bg-[#2D6A4F] text-[#B1F0CE] flex items-center justify-center shrink-0 shadow-2xs">
+              <ShieldCheck className="w-6 h-6 text-[#B1F0CE]" />
             </div>
             <div className="text-left">
               <strong className="text-xs sm:text-sm font-black block text-[#0F5238]">
-                ¿Molestia articular? Adaptar
+                ¿Sientes molestia? Cambiar ejercicio
               </strong>
-              <span className="text-[11px] text-[#2D6A4F] block leading-tight">
-                Toca para cambiar por variante suave, apoyo en pared o respirar sin penalización.
+              <span className="text-[11px] text-[#2D6A4F] block leading-tight mt-0.5">
+                Variante suave sin impacto, apoyo seguro o pausa sin penalizar tu progreso.
               </span>
             </div>
           </div>
@@ -1140,14 +1213,14 @@ export const ActiveWorkoutScreen: React.FC = () => {
       {/* Fixed Bottom Action Bar: 56px Primary Button Adaptive to Current Phase */}
       <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-[#EDEEEF] p-4 z-40 shadow-lg">
         {phase === 'PREPARATION' ? (
-          /* Botón Fase 1: ¡Entendido, empezar Serie X! (56px) */
+          /* Botón Fase 1: Empezar serie X (56px) */
           <button
             type="button"
             onClick={startActiveSet}
             className="w-full h-14 rounded-2xl bg-[#2D6A4F] text-white font-black text-base hover:bg-[#0F5238] active:scale-[0.98] flex items-center justify-center gap-2.5 shadow-md transition-all duration-200"
           >
             <Play className="w-5 h-5 fill-white" />
-            <span>¡Entendido, empezar Serie {currentSet}!</span>
+            <span>Empezar serie {currentSet}</span>
           </button>
         ) : phase === 'SET_ACTIVE' ? (
           /* Botón Fase 2: Serie completada (o terminar ejercicio si es la 3ª serie) */

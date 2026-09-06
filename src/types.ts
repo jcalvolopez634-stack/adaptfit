@@ -82,10 +82,14 @@ export type BiologicalSex = 'Mujer' | 'Hombre';
 export type FitnessLevel = 'Iniciación / Recuperación' | 'Moderado' | 'Activo habitual';
 
 export type HealthCondition =
-  | 'Molestia lumbar'
   | 'Molestia en rodillas'
+  | 'Molestia lumbar (espalda baja)'
+  | 'Molestia lumbar'
+  | 'Molestia en hombros / cuello'
   | 'Molestia en hombros/cuello'
+  | 'Molestia o limitación en cadera'
   | 'Problemas de equilibrio'
+  | 'Ninguna molestia'
   | 'Ninguna';
 
 export type EquipmentAvailableChoice =

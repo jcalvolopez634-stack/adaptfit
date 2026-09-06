@@ -10,6 +10,8 @@ import {
   FitnessLevel,
   HealthCondition,
   EquipmentAvailableChoice,
+  AvailableEquipmentId,
+  DumbbellType,
 } from '../types';
 import { calculateBMI } from '../utils/anthropometry';
 import {
@@ -90,22 +92,28 @@ const HEALTH_CONDITIONS_OPTIONS: {
   clinicalRule: string;
 }[] = [
   {
-    id: 'Molestia lumbar',
-    label: 'Molestia lumbar',
-    clinicalRule:
-      'Neutraliza flexiones de tronco; prioriza estabilización de cadera y pared.',
-  },
-  {
     id: 'Molestia en rodillas',
     label: 'Molestia en rodillas',
     clinicalRule:
-      'Excluye sentadillas libres profundas; prescribe sentadilla a silla alta y puente glúteo en suelo.',
+      'Excluye sentadillas profundas; prescribe sentadilla a silla alta y puente glúteo.',
   },
   {
-    id: 'Molestia en hombros/cuello',
-    label: 'Molestia en hombros/cuello',
+    id: 'Molestia lumbar (espalda baja)',
+    label: 'Molestia lumbar (espalda baja)',
     clinicalRule:
-      'Mantiene movimientos por debajo de la horizontal del hombro (retracción isométrica baja).',
+      'Neutraliza flexiones bruscas; prioriza estabilización lumbopélvica y pared.',
+  },
+  {
+    id: 'Molestia en hombros / cuello',
+    label: 'Molestia en hombros / cuello',
+    clinicalRule:
+      'Movimientos bajo la línea de los hombros y retracción escapular baja.',
+  },
+  {
+    id: 'Molestia o limitación en cadera',
+    label: 'Molestia o limitación en cadera',
+    clinicalRule:
+      'Prohíbe flexiones profundas (>90°) y abducciones forzadas; prioriza puente glúteo y estabilidad.',
   },
   {
     id: 'Problemas de equilibrio',
@@ -115,38 +123,55 @@ const HEALTH_CONDITIONS_OPTIONS: {
   },
   {
     id: 'Ninguna',
-    label: 'Ninguna molestia',
+    label: 'Ninguna molestia (Articulaciones libres)',
     clinicalRule:
       'Articulaciones libres; prescripción sin restricciones preventivas especiales.',
   },
 ];
 
-const EQUIPMENT_CHOICES: {
-  id: EquipmentAvailableChoice;
+const EQUIPMENT_OPTIONS: {
+  id: AvailableEquipmentId;
   label: string;
   icon: string;
   description: string;
+  isMandatory?: boolean;
 }[] = [
   {
-    id: 'Solo peso corporal y silla',
-    label: 'Solo peso corporal y silla',
-    icon: '🪑',
-    description:
-      'Todo guiado con tu propio cuerpo, una silla firme de casa y apoyo en pared.',
+    id: 'peso_corporal',
+    label: 'Peso corporal',
+    icon: '🧘',
+    description: 'La base segura de todos los ejercicios. Siempre activo por defecto.',
+    isMandatory: true,
   },
   {
-    id: 'Bandas elásticas',
+    id: 'silla_firme',
+    label: 'Silla firme / Banco',
+    icon: '🪑',
+    description: 'Silla resistente sin ruedas para ejercicios sentados y apoyo asistido.',
+  },
+  {
+    id: 'pared_libre',
+    label: 'Pared despejada',
+    icon: '🧱',
+    description: 'Espacio vertical despejado para apoyos isométricos y descargas posturales.',
+  },
+  {
+    id: 'bandas_elasticas',
     label: 'Bandas elásticas',
     icon: '🎗️',
-    description:
-      'Resistencia progresiva suave, sin aceleraciones bruscas ni impacto articular.',
+    description: 'Resistencia elástica progresiva suave sin aceleraciones bruscas ni inercia.',
   },
   {
-    id: 'Mancuernas / Pesos',
+    id: 'mancuernas',
     label: 'Mancuernas / Pesos',
     icon: '🏋️',
-    description:
-      'Sobrecarga con mancuernas ligeras (1 a 4 kg) o botellas de agua.',
+    description: 'Sobrecarga con mancuernas ligeras (1 a 5+ kg) o botellas de agua.',
+  },
+  {
+    id: 'esterilla',
+    label: 'Esterilla / Colchoneta',
+    icon: '🧘‍♂️',
+    description: 'Comodidad para ejercicios en el suelo (puente glúteo y movilidad lumbopélvica).',
   },
 ];
 
@@ -157,7 +182,8 @@ export const OnboardingClinicalScreen: React.FC = () => {
     setBiologicalSex,
     setFitnessLevel,
     toggleHealthCondition,
-    setEquipmentAvailable,
+    toggleEquipment,
+    setDumbbellConfig,
     navigateTo,
   } = useApp();
 
@@ -197,7 +223,7 @@ export const OnboardingClinicalScreen: React.FC = () => {
     Boolean(userProfile.biologicalSex) &&
     Boolean(userProfile.fitnessLevel) &&
     (userProfile.healthConditions || []).length > 0 &&
-    Boolean(userProfile.equipmentAvailable);
+    (userProfile.availableEquipment || []).length > 0;
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#191C1D] flex flex-col justify-between max-w-md mx-auto shadow-2xl border-x border-[#E1E3E4] font-sans pb-28">
@@ -428,43 +454,53 @@ export const OnboardingClinicalScreen: React.FC = () => {
           </div>
         </section>
 
-        {/* 4. Equipamiento Disponible */}
+        {/* 4. Equipamiento Disponible (Selección Múltiple) */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wider text-[#191C1D] flex items-center gap-2">
               <Dumbbell className="w-4 h-4 text-[#2D6A4F]" />
-              <span>4. Equipamiento Disponible</span>
+              <span>4. Equipamiento Disponible en Casa</span>
             </h2>
-            <span className="text-[11px] text-[#707973]">Selecciona uno</span>
+            <span className="text-[11px] text-[#707973]">Selección múltiple</span>
           </div>
           <p className="text-xs text-[#707973]">
-            Filtra los ejercicios a tus herramientas disponibles en casa:
+            Marca todo el material del que dispones. El motor adaptará los ejercicios únicamente a tu inventario real:
           </p>
 
           <div className="space-y-2">
-            {EQUIPMENT_CHOICES.map((eq) => {
-              const isSelected = userProfile.equipmentAvailable === eq.id;
+            {EQUIPMENT_OPTIONS.map((eq) => {
+              const isSelected = (userProfile.availableEquipment || []).includes(eq.id);
+              const isMandatory = eq.id === 'peso_corporal';
+
               return (
                 <button
                   key={eq.id}
                   type="button"
-                  onClick={() => setEquipmentAvailable(eq.id)}
+                  onClick={() => toggleEquipment(eq.id)}
+                  disabled={isMandatory}
                   className={`w-full p-3.5 rounded-2xl border-2 text-left transition-all flex items-center justify-between gap-3 ${
                     isSelected
                       ? 'border-[#2D6A4F] bg-[#E7F3EC]/70 shadow-xs'
                       : 'border-[#EDEEEF] bg-white hover:border-[#CFD3D1]'
-                  }`}
+                  } ${isMandatory ? 'cursor-default opacity-95' : ''}`}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <span className="text-2xl shrink-0">{eq.icon}</span>
                     <div>
-                      <span
-                        className={`text-xs font-black block ${
-                          isSelected ? 'text-[#0F5238]' : 'text-[#191C1D]'
-                        }`}
-                      >
-                        {eq.label}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-xs font-black block ${
+                            isSelected ? 'text-[#0F5238]' : 'text-[#191C1D]'
+                          }`}
+                        >
+                          {eq.label}
+                        </span>
+                        {isMandatory && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-[#2D6A4F] text-white">
+                            Base obligatoria
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[11px] text-[#525B54] block mt-0.5">
                         {eq.description}
                       </span>
@@ -472,7 +508,7 @@ export const OnboardingClinicalScreen: React.FC = () => {
                   </div>
 
                   <div
-                    className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border ${
+                    className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border ${
                       isSelected
                         ? 'bg-[#2D6A4F] border-[#2D6A4F] text-white'
                         : 'border-[#D0D4D2] bg-[#F8F9FA]'
@@ -484,6 +520,79 @@ export const OnboardingClinicalScreen: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Si tiene mancuernas seleccionadas, permitir afinar tipo y pesos */}
+          {(userProfile.availableEquipment || []).includes('mancuernas') && (
+            <div className="p-4 bg-white border border-[#2D6A4F]/30 rounded-2xl space-y-3 mt-2 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-[#191C1D] flex items-center gap-1.5">
+                  <span>🏋️</span> Configuración de Pesas / Mancuernas
+                </span>
+                <span className="text-[10px] text-[#2D6A4F] font-bold">Sobrecarga adaptada</span>
+              </div>
+
+              {/* Selector de Tipo de Mancuerna */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'fijas' as DumbbellType, label: 'Pesas fijas (pares)', desc: '1kg, 2kg, 3kg...' },
+                  { id: 'ajustables_discos' as DumbbellType, label: 'Ajustables / Discos', desc: 'Barra con rosca' },
+                ].map((t) => {
+                  const isCur = (userProfile.dumbbellType || 'fijas') === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setDumbbellConfig(t.id, userProfile.availableWeightsKg || [1, 2, 3, 4, 5])}
+                      className={`p-2.5 rounded-xl text-left border transition-all ${
+                        isCur
+                          ? 'border-[#2D6A4F] bg-[#E7F3EC] text-[#0F5238] font-bold'
+                          : 'border-[#EDEEEF] bg-[#F8F9FA] text-[#404943]'
+                      }`}
+                    >
+                      <span className="text-xs font-bold block">{t.label}</span>
+                      <span className="text-[10px] text-[#707973] block mt-0.5">{t.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Pesos sugeridos / disponibles */}
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-[#707973] block">
+                  Pesos disponibles que tienes en casa (kg):
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map((w) => {
+                    const hasWeight = (userProfile.availableWeightsKg || [1, 2, 3, 4, 5]).includes(w);
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => {
+                          const current = userProfile.availableWeightsKg || [1, 2, 3, 4, 5];
+                          let next: number[];
+                          if (hasWeight) {
+                            next = current.filter((item) => item !== w);
+                            if (next.length === 0) next = [w]; // Al menos un peso
+                          } else {
+                            next = [...current, w].sort((a, b) => a - b);
+                          }
+                          setDumbbellConfig(userProfile.dumbbellType || 'fijas', next);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                          hasWeight
+                            ? 'bg-[#2D6A4F] text-white shadow-2xs'
+                            : 'bg-[#F3F4F5] text-[#707973] hover:bg-[#EDEEEF]'
+                        }`}
+                      >
+                        {w} kg
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* 5. Antropometría Opcional */}
