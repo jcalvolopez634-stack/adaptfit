@@ -51,9 +51,16 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-[#EDEEEF] px-2 py-2 z-40 shadow-lg flex items-center justify-around">
+    <nav
+      id="bottom-navigation-bar"
+      aria-label="Navegación principal"
+      className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-[#EDEEEF] px-1 py-1.5 z-40 shadow-lg grid grid-cols-5 items-center"
+    >
       {navItems.map((item) => {
-        const isActive = currentScreen === item.id;
+        const isActive =
+          currentScreen === item.id ||
+          (item.id === 'clinical_report' && currentScreen === 'evolution') ||
+          (item.id === 'calendar_sync' && currentScreen === 'calendar');
         const Icon = item.icon;
 
         return (
@@ -61,20 +68,24 @@ export const BottomNav: React.FC = () => {
             key={item.id}
             type="button"
             onClick={() => navigateTo(item.id)}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-2xl transition-all min-w-[58px] ${
+            className={`flex flex-col items-center justify-center py-1 px-0.5 rounded-2xl transition-all min-w-0 w-full group cursor-pointer select-none ${
               isActive
-                ? 'text-[#2D6A4F] font-black'
-                : 'text-[#707973] hover:text-[#191C1D] font-semibold'
+                ? 'text-[#2D6A4F] font-extrabold'
+                : 'text-[#707973] hover:text-[#191C1D] font-medium'
             }`}
           >
             <div
-              className={`w-9 h-8 rounded-xl flex items-center justify-center transition-all ${
-                isActive ? 'bg-[#E7F3EC] text-[#2D6A4F]' : 'bg-transparent'
+              className={`w-8 h-7 rounded-xl flex items-center justify-center transition-all ${
+                isActive ? 'bg-[#E7F3EC] text-[#2D6A4F]' : 'bg-transparent group-hover:bg-[#F3F4F5]'
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+              <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
             </div>
-            <span className="text-[10px] tracking-tight mt-0.5 whitespace-nowrap">
+            <span
+              className={`text-[10px] tracking-tight mt-0.5 block truncate max-w-full text-center leading-none ${
+                isActive ? 'font-black text-[#2D6A4F]' : 'text-[#707973]'
+              }`}
+            >
               {item.label}
             </span>
           </button>

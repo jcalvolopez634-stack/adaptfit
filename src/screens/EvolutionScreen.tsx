@@ -47,6 +47,7 @@ export const EvolutionScreen: React.FC = () => {
     annualPlan,
     streakDays,
     downloadClinicalReportPDF,
+    navigateTo,
     goBack,
     userProfile,
     anthropometricRecords,
@@ -647,172 +648,61 @@ export const EvolutionScreen: React.FC = () => {
         )}
 
         {/* =========================================================
-            1. TRES TARJETAS NUMÉRICAS GRANDES
+            BLOQUE 1: RESUMEN SUPERIOR COMPACTO + PUNTO DE PARTIDA (DÍA 1)
             ========================================================= */}
-        <section className="grid grid-cols-3 gap-2.5">
-          {/* Tarjeta 1: Sesiones totales */}
-          <div className="p-3.5 rounded-2xl bg-white border border-[#E1E3E4] flex flex-col items-center text-center shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center mb-1.5">
-              <Activity className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-bold text-[#707973] uppercase tracking-wider">
-              Sesiones
-            </span>
-            <strong className="text-2xl font-black text-[#191C1D] mt-0.5">
-              {totalSessions}
-            </strong>
-            <span className="text-[10px] text-[#2D6A4F] font-semibold mt-0.5">
-              completadas
-            </span>
-          </div>
-
-          {/* Tarjeta 2: Minutos activos */}
-          <div className="p-3.5 rounded-2xl bg-white border border-[#E1E3E4] flex flex-col items-center text-center shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center mb-1.5">
-              <Clock className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-bold text-[#707973] uppercase tracking-wider">
-              Minutos
-            </span>
-            <strong className="text-2xl font-black text-[#191C1D] mt-0.5">
-              {totalMinutes}
-            </strong>
-            <span className="text-[10px] text-[#2D6A4F] font-semibold mt-0.5">
-              acumulados
-            </span>
-          </div>
-
-          {/* Tarjeta 3: Días de racha */}
-          <div className="p-3.5 rounded-2xl bg-white border border-[#E1E3E4] flex flex-col items-center text-center shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-[#FFF6ED] text-[#E76F51] flex items-center justify-center mb-1.5">
-              <Flame className="w-4 h-4 fill-[#E76F51]" />
-            </div>
-            <span className="text-[10px] font-bold text-[#707973] uppercase tracking-wider">
-              Racha
-            </span>
-            <strong className="text-2xl font-black text-[#8E4E14] mt-0.5">
-              {streakDays}
-            </strong>
-            <span className="text-[10px] text-[#8E4E14] font-semibold mt-0.5">
-              días seguidos
-            </span>
-          </div>
-        </section>
-
-        {/* =========================================================
-            2. MÓDULO COMPLETO: COMPOSICIÓN CORPORAL Y PESO
-            ========================================================= */}
-        <section className="p-5 rounded-3xl bg-white border border-[#E1E3E4] shadow-xs space-y-4">
-          {/* Encabezado del Módulo */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center">
-                <Scale className="w-4 h-4" />
+        <section className="space-y-3">
+          {/* 1A. Tres tarjetas numéricas compactas */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {/* Tarjeta 1: Sesiones totales */}
+            <div className="p-3.5 rounded-2xl bg-white border border-[#E1E3E4] flex flex-col items-center text-center shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center mb-1.5">
+                <Activity className="w-4 h-4" />
               </div>
-              <div>
-                <h2 className="text-sm font-black text-[#191C1D]">
-                  Composición Corporal y Peso
-                </h2>
-                <p className="text-[11px] text-[#707973]">
-                  Seguimiento de peso, IMC y perímetros
-                </p>
-              </div>
+              <span className="text-[10px] font-bold text-[#707973] uppercase tracking-wider">
+                Sesiones
+              </span>
+              <strong className="text-2xl font-black text-[#191C1D] mt-0.5">
+                {totalSessions}
+              </strong>
+              <span className="text-[10px] text-[#2D6A4F] font-semibold mt-0.5">
+                {totalSessions === 0 ? 'Empieza hoy' : 'completadas'}
+              </span>
             </div>
 
-            <button
-              type="button"
-              onClick={openRegisterModal}
-              className="px-3 py-1.5 rounded-xl bg-[#2D6A4F] hover:bg-[#1b4332] text-white text-xs font-bold flex items-center gap-1 shadow-xs transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Registrar</span>
-            </button>
-          </div>
-
-          {/* Tarjeta Resumen: Peso, IMC y Clasificación OMS */}
-          <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E1E3E4] space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              {/* Peso actual */}
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#707973] block">
-                  Peso Actual
-                </span>
-                <div className="flex items-baseline gap-1 mt-0.5">
-                  <strong className="text-2xl font-black text-[#191C1D]">
-                    {currentWeightKg ? `${currentWeightKg}` : '--'}
-                  </strong>
-                  <span className="text-xs font-bold text-[#707973]">kg</span>
-                </div>
-
-                {weightChangeDiff !== null && (
-                  <div
-                    className={`flex items-center gap-1 text-[11px] font-bold mt-1 ${
-                      weightChangeDiff <= 0 ? 'text-[#2D6A4F]' : 'text-[#8E4E14]'
-                    }`}
-                  >
-                    {weightChangeDiff <= 0 ? (
-                      <TrendingDown className="w-3 h-3 text-[#2D6A4F]" />
-                    ) : (
-                      <TrendingUp className="w-3 h-3 text-[#8E4E14]" />
-                    )}
-                    <span>
-                      {weightChangeDiff > 0 ? `+${weightChangeDiff}` : `${weightChangeDiff}`} kg vs anterior
-                    </span>
-                  </div>
-                )}
+            {/* Tarjeta 2: Minutos activos */}
+            <div className="p-3.5 rounded-2xl bg-white border border-[#E1E3E4] flex flex-col items-center text-center shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center mb-1.5">
+                <Clock className="w-4 h-4" />
               </div>
-
-              {/* IMC y Badge OMS */}
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#707973] block">
-                  Índice de Masa Corporal (IMC)
-                </span>
-                <div className="flex items-baseline gap-1 mt-0.5">
-                  <strong className="text-2xl font-black text-[#191C1D]">
-                    {currentBmiValue ? `${currentBmiValue}` : '--'}
-                  </strong>
-                  <span className="text-xs font-bold text-[#707973]">kg/m²</span>
-                </div>
-
-                {/* Badge OMS */}
-                <div className="mt-1">
-                  {currentBmiCategory === 'normopeso' ? (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#E7F3EC] text-[#0F5238]">
-                      Normopeso (Saludable OMS)
-                    </span>
-                  ) : currentBmiCategory === 'sobrepeso' ? (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#FFF6ED] text-[#8E4E14]">
-                      Sobrepeso (OMS)
-                    </span>
-                  ) : currentBmiCategory === 'obesidad' ? (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#FDF0EE] text-[#9C3220]">
-                      Obesidad (OMS)
-                    </span>
-                  ) : currentBmiCategory === 'bajo_peso' ? (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#EBF3FA] text-[#1D6FA5]">
-                      Bajo peso (OMS)
-                    </span>
-                  ) : (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#EDEEEF] text-[#707973]">
-                      Pendiente de registro
-                    </span>
-                  )}
-                </div>
-              </div>
+              <span className="text-[10px] font-bold text-[#707973] uppercase tracking-wider">
+                Minutos
+              </span>
+              <strong className="text-2xl font-black text-[#191C1D] mt-0.5">
+                {totalMinutes}
+              </strong>
+              <span className="text-[10px] text-[#2D6A4F] font-semibold mt-0.5">
+                acumulados
+              </span>
             </div>
 
-            {/* Fecha del último registro */}
-            {latestAnthro && (
-              <div className="pt-2 border-t border-[#EDEEEF] flex items-center justify-between text-[11px] text-[#707973]">
-                <span>Último control: {new Date(latestAnthro.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                <span>Estatura: {currentHeightCm} cm</span>
+            {/* Tarjeta 3: Días de racha */}
+            <div className="p-3.5 rounded-2xl bg-white border border-[#E1E3E4] flex flex-col items-center text-center shadow-2xs">
+              <div className="w-8 h-8 rounded-xl bg-[#FFF6ED] text-[#E76F51] flex items-center justify-center mb-1.5">
+                <Flame className="w-4 h-4 fill-[#E76F51]" />
               </div>
-            )}
+              <span className="text-[10px] font-bold text-[#707973] uppercase tracking-wider">
+                Racha
+              </span>
+              <strong className="text-2xl font-black text-[#8E4E14] mt-0.5">
+                {streakDays}
+              </strong>
+              <span className="text-[10px] text-[#8E4E14] font-semibold mt-0.5">
+                {streakDays === 0 ? 'Primer paso' : 'días seguidos'}
+              </span>
+            </div>
           </div>
 
-          {/* =========================================================
-              2.A TARJETA PUNTO DE PARTIDA (DÍA 1)
-              ========================================================= */}
+          {/* 1B. Tarjeta Punto de Partida (Día 1) Editable */}
           <div className="p-4 rounded-2xl bg-white border border-[#E1E3E4] space-y-3 shadow-2xs">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -892,9 +782,34 @@ export const EvolutionScreen: React.FC = () => {
               </p>
             )}
           </div>
+        </section>
+
+        {/* =========================================================
+            BLOQUE 2: PANEL DE METAS + ASESOR TELEGRÁFICO
+            ========================================================= */}
+        <section className="p-5 rounded-3xl bg-white border border-[#E1E3E4] shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center">
+                <Target className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-[#191C1D]">
+                  Metas y Diagnóstico Rápido
+                </h2>
+                <p className="text-[11px] text-[#707973]">
+                  Progreso hacia tus metas y consejos directos
+                </p>
+              </div>
+            </div>
+
+            <span className="text-[10px] font-bold text-[#2D6A4F] bg-[#E7F3EC] px-2 py-0.5 rounded-full">
+              Evolución Funcional
+            </span>
+          </div>
 
           {/* =========================================================
-              2.B ASESOR CORPORAL: FORMATO TELEGRÁFICO (SIN PALABROS)
+              2.A ASESOR CORPORAL: FORMATO TELEGRÁFICO (SIN PALABROS)
               ========================================================= */}
           <div className="p-4 rounded-2xl bg-[#E7F3EC] border border-[#B1F0CE] space-y-2.5">
             <div className="flex items-center justify-between">
@@ -1096,9 +1011,121 @@ export const EvolutionScreen: React.FC = () => {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* =========================================================
+            BLOQUE 3: REGISTRO DE MEDIDAS CORPORALES
+            ========================================================= */}
+        <section className="p-5 rounded-3xl bg-white border border-[#E1E3E4] shadow-xs space-y-4">
+          {/* Encabezado con botón "+ Añadir pesaje/medida" */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center">
+                <Scale className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-[#191C1D]">
+                  Medidas y Composición Corporal
+                </h2>
+                <p className="text-[11px] text-[#707973]">
+                  Peso, IMC y perímetros anatómicos
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={openRegisterModal}
+              className="px-3 py-1.5 rounded-xl bg-[#2D6A4F] hover:bg-[#1b4332] text-white text-xs font-bold flex items-center gap-1 shadow-xs transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Añadir pesaje/medida</span>
+            </button>
+          </div>
+
+          {/* Tarjeta Resumen: Peso, IMC y Clasificación OMS */}
+          <div className="p-4 rounded-2xl bg-[#F8F9FA] border border-[#E1E3E4] space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              {/* Peso actual */}
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#707973] block">
+                  Peso Actual
+                </span>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <strong className="text-2xl font-black text-[#191C1D]">
+                    {currentWeightKg ? `${currentWeightKg}` : '--'}
+                  </strong>
+                  <span className="text-xs font-bold text-[#707973]">kg</span>
+                </div>
+
+                {weightChangeDiff !== null && (
+                  <div
+                    className={`flex items-center gap-1 text-[11px] font-bold mt-1 ${
+                      weightChangeDiff <= 0 ? 'text-[#2D6A4F]' : 'text-[#8E4E14]'
+                    }`}
+                  >
+                    {weightChangeDiff <= 0 ? (
+                      <TrendingDown className="w-3 h-3 text-[#2D6A4F]" />
+                    ) : (
+                      <TrendingUp className="w-3 h-3 text-[#8E4E14]" />
+                    )}
+                    <span>
+                      {weightChangeDiff > 0 ? `+${weightChangeDiff}` : `${weightChangeDiff}`} kg vs anterior
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* IMC y Badge OMS */}
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#707973] block">
+                  Índice de Masa Corporal (IMC)
+                </span>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <strong className="text-2xl font-black text-[#191C1D]">
+                    {currentBmiValue ? `${currentBmiValue}` : '--'}
+                  </strong>
+                  <span className="text-xs font-bold text-[#707973]">kg/m²</span>
+                </div>
+
+                {/* Badge OMS */}
+                <div className="mt-1">
+                  {currentBmiCategory === 'normopeso' ? (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#E7F3EC] text-[#0F5238]">
+                      Normopeso (Saludable OMS)
+                    </span>
+                  ) : currentBmiCategory === 'sobrepeso' ? (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#FFF6ED] text-[#8E4E14]">
+                      Sobrepeso (OMS)
+                    </span>
+                  ) : currentBmiCategory === 'obesidad' ? (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#FDF0EE] text-[#9C3220]">
+                      Obesidad (OMS)
+                    </span>
+                  ) : currentBmiCategory === 'bajo_peso' ? (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#EBF3FA] text-[#1D6FA5]">
+                      Bajo peso (OMS)
+                    </span>
+                  ) : (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#EDEEEF] text-[#707973]">
+                      Pendiente de registro
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fecha del último registro */}
+            {latestAnthro && (
+              <div className="pt-2 border-t border-[#EDEEEF] flex items-center justify-between text-[11px] text-[#707973]">
+                <span>Último control: {new Date(latestAnthro.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                <span>Estatura: {currentHeightCm} cm</span>
+              </div>
+            )}
+          </div>
 
           {/* =========================================================
-              2.C GRÁFICO SVG DE EVOLUCIÓN DE PESO
+              3.A GRÁFICO SVG DE EVOLUCIÓN DE PESO
               ========================================================= */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -1467,7 +1494,7 @@ export const EvolutionScreen: React.FC = () => {
         </section>
 
         {/* =========================================================
-            3. GRÁFICO DE BARRAS: FRECUENCIA SEMANAL
+            BLOQUE 4: ACTIVIDAD Y FRECUENCIA DE ENTRENAMIENTO
             ========================================================= */}
         <section className="p-5 rounded-3xl bg-white border border-[#E1E3E4] shadow-xs space-y-4">
           <div className="flex items-center justify-between">

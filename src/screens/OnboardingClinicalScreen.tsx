@@ -40,16 +40,16 @@ const BIOLOGICAL_SEX_OPTIONS: {
   {
     id: 'Mujer',
     label: 'Mujer',
-    badge: 'Estabilidad Pélvica',
+    badge: 'Cuidado Pélvico y Articular',
     description:
-      'Ajuste biomecánico: mayor énfasis en alineación lumbopélvica, activación de glúteo medio y prevención de valgo dinámico de rodilla.',
+      'Ajustamos los ejercicios para reforzar caderas, proteger rodillas y cuidar tu postura con total seguridad.',
   },
   {
     id: 'Hombre',
     label: 'Hombre',
-    badge: 'Cadena Posterior',
+    badge: 'Espalda y Postura',
     description:
-      'Ajuste biomecánico: descompresión de columna, elongación y movilidad de isquiosurales con protección lumbosacra.',
+      'Ajustamos los ejercicios para liberar tensión en la columna, ganar flexibilidad y cuidar la espalda baja.',
   },
 ];
 
@@ -95,37 +95,37 @@ const HEALTH_CONDITIONS_OPTIONS: {
     id: 'Molestia en rodillas',
     label: 'Molestia en rodillas',
     clinicalRule:
-      'Excluye sentadillas profundas; prescribe sentadilla a silla alta y puente glúteo.',
+      'Adaptamos las flexiones a tu rango cómodo y evitamos cualquier impacto en rodillas.',
   },
   {
     id: 'Molestia lumbar (espalda baja)',
     label: 'Molestia lumbar (espalda baja)',
     clinicalRule:
-      'Neutraliza flexiones bruscas; prioriza estabilización lumbopélvica y pared.',
+      'Protegemos tu zona lumbar evitando flexiones bruscas y reforzando el abdomen de forma segura.',
   },
   {
     id: 'Molestia en hombros / cuello',
     label: 'Molestia en hombros / cuello',
     clinicalRule:
-      'Movimientos bajo la línea de los hombros y retracción escapular baja.',
+      'Cuidamos el cuello y evitamos elevar cargas por encima de la línea de los hombros.',
   },
   {
     id: 'Molestia o limitación en cadera',
     label: 'Molestia o limitación en cadera',
     clinicalRule:
-      'Prohíbe flexiones profundas (>90°) y abducciones forzadas; prioriza puente glúteo y estabilidad.',
+      'Ejercicios suaves y estables sin aperturas forzadas ni flexiones profundas.',
   },
   {
     id: 'Problemas de equilibrio',
     label: 'Problemas de equilibrio',
     clinicalRule:
-      'Asegura apoyo asistido permanente con silla firme o pared; descarta apoyos inestables.',
+      'Siempre con apoyo seguro en silla firme o pared para entrenar con total tranquilidad.',
   },
   {
     id: 'Ninguna',
     label: 'Ninguna molestia (Articulaciones libres)',
     clinicalRule:
-      'Articulaciones libres; prescripción sin restricciones preventivas especiales.',
+      'Movimiento libre y progresión equilibrada de fuerza y vitalidad.',
   },
 ];
 
@@ -256,13 +256,13 @@ export const OnboardingClinicalScreen: React.FC = () => {
         <section className="space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E7F3EC] text-[#0F5238] text-xs font-semibold">
             <HeartHandshake className="w-3.5 h-3.5 text-[#2D6A4F]" />
-            <span>Prescripción Médica y Biomecánica Personalizada</span>
+            <span>Plan adaptado y 100% seguro</span>
           </div>
           <h1 className="text-2xl font-black tracking-tight text-[#191C1D] leading-tight">
-            Configuración de tu Perfil de Seguridad
+            Ajustemos tu entrenamiento a tu medida
           </h1>
           <p className="text-xs text-[#525B54] leading-relaxed">
-            Estos parámetros alimentan el motor clínico inteligente de AdaptFit para prescribir tus ejercicios con cero impacto y protección de zonas sensibles.
+            Diseñamos tus ejercicios para cuidar tu postura, proteger tus articulaciones y asegurar que entrenes con total confianza desde el primer día.
           </p>
         </section>
 
@@ -273,10 +273,10 @@ export const OnboardingClinicalScreen: React.FC = () => {
               <User className="w-4 h-4 text-[#2D6A4F]" />
               <span>1. Sexo Biológico</span>
             </h2>
-            <span className="text-[11px] text-[#707973]">Consideración biomecánica</span>
+            <span className="text-[11px] text-[#707973]">Anatomía y cuidado postural</span>
           </div>
           <p className="text-xs text-[#707973]">
-            Ajusta los vectores de fuerza pélvica, rodilla y alineación raquídea:
+            Ajustamos los ejercicios para cuidar tu espalda, pelvis y articulaciones:
           </p>
 
           <div className="grid grid-cols-2 gap-3">
@@ -398,7 +398,7 @@ export const OnboardingClinicalScreen: React.FC = () => {
             <span className="text-[11px] text-[#707973]">Checkboxes</span>
           </div>
           <p className="text-xs text-[#707973]">
-            Marca las áreas donde sientes incomodidad para que el motor aplique las reglas de protección médica:
+            Marca las zonas donde suelas sentir molestias (adaptaremos o sustituiremos los ejercicios automáticamente para evitar dolor):
           </p>
 
           <div className="space-y-2">
@@ -444,7 +444,7 @@ export const OnboardingClinicalScreen: React.FC = () => {
                         {cond.label}
                       </span>
                       <span className="text-[11px] text-[#525B54] block mt-0.5 leading-snug">
-                        <strong>Regla clínica:</strong> {cond.clinicalRule}
+                        <strong>Adaptación segura:</strong> {cond.clinicalRule}
                       </span>
                     </div>
                   </div>

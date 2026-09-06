@@ -27,6 +27,7 @@ import {
   TrendingUp,
   AlertCircle,
   CalendarDays,
+  ChevronDown,
 } from 'lucide-react';
 
 const GOAL_OPTIONS: {
@@ -96,6 +97,7 @@ export const OnboardingGoalScreen: React.FC = () => {
     goBack,
   } = useApp();
 
+  const [showPhasesDetails, setShowPhasesDetails] = React.useState(false);
   const selectedDaysList = annualPlan.selectedDays || ['Lunes', 'Miércoles', 'Viernes'];
   const isValidDaysCount = selectedDaysList.length === annualPlan.daysPerWeek;
 
@@ -401,50 +403,77 @@ export const OnboardingGoalScreen: React.FC = () => {
           </div>
         </section>
 
-        {/* Section 4: Las 4 Fases Trimestrales del Año (Q1 a Q4) */}
-        <section className="space-y-3.5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-[#191C1D]">
-              Estructura de tu Macrociclo (Q1 a Q4)
-            </h2>
-            <span className="text-xs text-[#2D6A4F] font-bold">52 Semanas</span>
-          </div>
-
-          <div className="space-y-3">
-            {annualPlan.phases.map((phase, idx) => (
-              <div
-                key={phase.quarter}
-                className="p-4 rounded-2xl bg-white border border-[#E1E3E4] flex items-start gap-3.5 relative overflow-hidden"
-              >
-                {/* Accent indicator line */}
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-1.5"
-                  style={{ backgroundColor: phase.accentColor }}
-                />
-
-                <div className="w-10 h-10 rounded-xl bg-[#F3F4F5] flex flex-col items-center justify-center shrink-0">
-                  <span className="text-xs font-extrabold text-[#191C1D]">
-                    {phase.quarter}
-                  </span>
-                  <span className="text-[9px] text-[#707973]">Fase {idx + 1}</span>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <strong className="text-sm font-bold text-[#191C1D]">
-                      {phase.title}
-                    </strong>
-                    <span className="text-[10px] text-[#707973] font-medium">
-                      {phase.monthsRange}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#404943] mt-1 leading-relaxed">
-                    {phase.description}
-                  </p>
-                </div>
+        {/* Section 4: Las 4 Fases Trimestrales del Año (Colapsado por defecto) */}
+        <section className="pt-1">
+          <button
+            type="button"
+            onClick={() => setShowPhasesDetails((prev) => !prev)}
+            className="w-full p-3.5 rounded-2xl bg-white border border-[#E1E3E4] hover:border-[#2D6A4F] text-left flex items-center justify-between transition-all shadow-2xs group cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center">
+                <CalendarDays className="w-4 h-4" />
               </div>
-            ))}
-          </div>
+              <div>
+                <span className="text-xs font-bold text-[#191C1D] group-hover:text-[#2D6A4F] transition-colors block">
+                  Estructura de las 52 semanas del año
+                </span>
+                <span className="text-[11px] text-[#707973]">
+                  {showPhasesDetails ? 'Toca para ocultar fases' : 'Opcional • Toca para ver las 4 fases del año'}
+                </span>
+              </div>
+            </div>
+            <ChevronDown
+              className={`w-4 h-4 text-[#707973] transition-transform duration-200 ${
+                showPhasesDetails ? 'rotate-180 text-[#2D6A4F]' : ''
+              }`}
+            />
+          </button>
+
+          {showPhasesDetails && (
+            <div className="space-y-3 mt-3 pt-1">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#191C1D]">
+                  Distribución Trimestral (Q1 a Q4)
+                </span>
+                <span className="text-xs text-[#2D6A4F] font-bold">52 Semanas</span>
+              </div>
+
+              {annualPlan.phases.map((phase, idx) => (
+                <div
+                  key={phase.quarter}
+                  className="p-4 rounded-2xl bg-white border border-[#E1E3E4] flex items-start gap-3.5 relative overflow-hidden"
+                >
+                  {/* Accent indicator line */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-1.5"
+                    style={{ backgroundColor: phase.accentColor }}
+                  />
+
+                  <div className="w-10 h-10 rounded-xl bg-[#F3F4F5] flex flex-col items-center justify-center shrink-0">
+                    <span className="text-xs font-extrabold text-[#191C1D]">
+                      {phase.quarter}
+                    </span>
+                    <span className="text-[9px] text-[#707973]">Fase {idx + 1}</span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <strong className="text-sm font-bold text-[#191C1D]">
+                        {phase.title}
+                      </strong>
+                      <span className="text-[10px] text-[#707973] font-medium">
+                        {phase.monthsRange}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#404943] mt-1 leading-relaxed">
+                      {phase.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
 

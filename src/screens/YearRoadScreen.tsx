@@ -219,15 +219,29 @@ export const YearRoadScreen: React.FC = () => {
           </div>
         </section>
 
-        {/* Action Button: 56px Primary Button */}
-        <button
-          type="button"
-          onClick={() => navigateTo('workout_active')}
-          className="w-full h-14 rounded-2xl bg-[#2D6A4F] text-white font-bold text-base hover:bg-[#0F5238] active:scale-[0.98] flex items-center justify-center gap-2 shadow-md transition-all duration-200"
-        >
-          <Play className="w-5 h-5 fill-white" />
-          <span>Continuar Sesión de Hoy (Semana {streakWeeks})</span>
-        </button>
+        {/* Mensaje sutil de redirección a Inicio para entrenar */}
+        <div className="p-4 rounded-2xl bg-white border border-[#E1E3E4] flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#E7F3EC] text-[#2D6A4F] flex items-center justify-center">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-[#191C1D] block">
+                Entrenamiento diario
+              </span>
+              <span className="text-[11px] text-[#707973]">
+                Inicia tu sesión de hoy desde la pantalla de Inicio
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigateTo('home')}
+            className="px-3 py-1.5 rounded-xl bg-[#E7F3EC] text-[#0F5238] hover:bg-[#2D6A4F] hover:text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
+          >
+            Ir a Inicio
+          </button>
+        </div>
       </main>
     </div>
   );
